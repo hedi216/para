@@ -23,9 +23,15 @@ Configuration attendue :
 Exemple SQL depuis un compte superutilisateur PostgreSQL :
 
 ```sql
-CREATE USER para WITH PASSWORD 'SMART';
+CREATE USER para WITH PASSWORD 'SMART' CREATEDB;
 CREATE DATABASE lola_parapharmacie OWNER para;
 GRANT ALL PRIVILEGES ON DATABASE lola_parapharmacie TO para;
+```
+
+Si le role `para` existe deja sans droit de creation de base, ajoutez :
+
+```sql
+ALTER ROLE para CREATEDB;
 ```
 
 Vous pouvez verifier la connexion avec :

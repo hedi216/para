@@ -27,9 +27,15 @@ Configuration locale attendue :
 Exemple SQL a executer avec `psql` depuis un compte superutilisateur PostgreSQL :
 
 ```sql
-CREATE USER para WITH PASSWORD 'SMART';
+CREATE USER para WITH PASSWORD 'SMART' CREATEDB;
 CREATE DATABASE lola_parapharmacie OWNER para;
 GRANT ALL PRIVILEGES ON DATABASE lola_parapharmacie TO para;
+```
+
+Si l'utilisateur `para` existe deja sans cette permission :
+
+```sql
+ALTER ROLE para CREATEDB;
 ```
 
 ### 2. Installer les dependances
