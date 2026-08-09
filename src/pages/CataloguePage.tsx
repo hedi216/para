@@ -1,9 +1,9 @@
 import { useSearchParams } from 'react-router-dom';
-import { categories } from '../data/catalog';
-import { useCart } from '../contexts/cart-context';
-import { useCatalogProducts } from '../hooks/use-catalog-products';
 import { ProductCard } from '../components/ProductCard';
 import { usePublicSearch } from '../components/PublicLayout';
+import { useCart } from '../contexts/cart-context';
+import { useCatalogCategories } from '../hooks/use-catalog-categories';
+import { useCatalogProducts } from '../hooks/use-catalog-products';
 
 export default function CataloguePage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -11,7 +11,9 @@ export default function CataloguePage() {
   const { addItem } = useCart();
   const selectedCategory = searchParams.get('category') ?? 'all';
   const requestedSearch = searchParams.get('search') ?? searchQuery;
-  const { products, isLoading, isUsingFallback } = useCatalogProducts(requestedSearch, selectedCategory);
+  const { products, isLoading, isUsingFallback, message: productsMessage } = useCatalogProducts(requestedSearch, selectedCategory);
+  const { categories, isUsingFallback: isUsingCategoryFallback, message: categoriesMessage } = useCatalogCategories();
+  const dataMessage = productsMessage ?? categoriesMessage;
 
   const setCategory = (category: string) => {
     const next = new URLSearchParams(searchParams);
@@ -62,7 +64,12 @@ export default function CataloguePage() {
           ))}
         </div>
 
-        {isUsingFallback && <p className="mb-5 text-sm text-secondary">Catalogue de démonstration affiché pendant le démarrage du service.</p>}
+        {(isUsingFallback || isUsingCategoryFallback || dataMessage) && (
+          <p className="mb-5 rounded-lg border border-primary-container bg-secondary-container/60 px-4 py-3 text-sm text-on-primary-container">
+            {dataMessage ?? 'Mode démonstration : le backend n’est pas disponible.'}
+          </p>
+        )}
+
         {isLoading ? (
           <div className="py-16 text-center text-on-surface-variant">Chargement des produits...</div>
         ) : products.length > 0 ? (

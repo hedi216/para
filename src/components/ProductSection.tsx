@@ -1,15 +1,16 @@
-import { categories, type Product } from '../data/catalog';
 import { Link } from 'react-router-dom';
+import type { Category, Product } from '../data/catalog';
 import { ProductCard } from './ProductCard';
 
 type ProductSectionProps = {
   products: Product[];
+  categories: Category[];
   activeCategory: string;
   onCategoryChange: (categoryId: string) => void;
   onAddToCart: (product: Product) => void;
 };
 
-export function ProductSection({ products, activeCategory, onCategoryChange, onAddToCart }: ProductSectionProps) {
+export function ProductSection({ products, categories, activeCategory, onCategoryChange, onAddToCart }: ProductSectionProps) {
   const filterItems = [{ id: 'all', name: 'Tous' }, ...categories];
 
   return (

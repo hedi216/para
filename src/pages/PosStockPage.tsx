@@ -8,6 +8,7 @@ import { formatPrice } from '../lib/currency';
 import type { ApiBrand, ApiCategory, ApiInventoryItem, ApiProduct } from '../types/api';
 
 type AdjustmentKind = 'ADD' | 'REMOVE' | 'CORRECTION' | 'SUPPLIER_RECEIPT' | 'LOSS' | 'CUSTOMER_RETURN';
+type PosMessage = { type: 'success' | 'error' | 'info'; text: string; canRetry?: boolean };
 
 type ProductForm = {
   name: string;
@@ -48,6 +49,16 @@ const adjustmentOptions: Array<{ value: AdjustmentKind; label: string; sign: 'po
 
 const fallbackImage = 'https://images.unsplash.com/photo-1556228720-195a672e8a03?auto=format&fit=crop&w=300&q=80';
 
+function getPosDataErrorMessage(error: unknown) {
+  if (error instanceof ApiError) {
+    if (error.status === 401) return 'Session expirée : reconnectez-vous avec un compte employé.';
+    if (error.status === 403) return 'Accès refusé : utilisez un compte employé ou admin.';
+    if (error.status >= 500) return 'Erreur backend : vérifiez PostgreSQL, les migrations et le seed.';
+    return error.message;
+  }
+  return 'Backend indisponible : démarrez le serveur avec cd server && npm run start:dev.';
+}
+
 function buildStockPath(search: string, category: string) {
   const params = new URLSearchParams();
   if (search.trim()) params.set('search', search.trim());
@@ -68,7 +79,7 @@ export default function PosStockPage() {
   const [quantity, setQuantity] = useState('');
   const [reasonDetail, setReasonDetail] = useState('');
   const [productForm, setProductForm] = useState<ProductForm>(emptyProductForm);
-  const [message, setMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
+  const [message, setMessage] = useState<PosMessage | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isCreatingProduct, setIsCreatingProduct] = useState(false);
@@ -96,8 +107,15 @@ export default function PosStockPage() {
       const items = await apiFetch<ApiInventoryItem[]>(buildStockPath(value, category));
       setInventory(items);
       setSelectedId((current) => (items.some((item) => item.id === current) ? current : items[0]?.id ?? ''));
+      if (items.length === 0 && !value.trim() && category === 'all') {
+        setMessage({ type: 'info', text: 'Base vide : aucun stock trouvé. Lancez cd server && npm run prisma:seed puis réessayez.' });
+      } else {
+        setMessage((current) => (current?.type === 'error' ? null : current));
+      }
     } catch (error) {
-      setMessage({ type: 'error', text: error instanceof ApiError ? error.message : 'Stock POS indisponible.' });
+      setInventory([]);
+      setSelectedId('');
+      setMessage({ type: 'error', text: getPosDataErrorMessage(error), canRetry: true });
     } finally {
       setIsLoading(false);
     }
@@ -105,10 +123,18 @@ export default function PosStockPage() {
 
   useEffect(() => {
     void Promise.all([loadMeta(), loadStock('', 'all')]).catch((error: Error) => {
-      setMessage({ type: 'error', text: error.message });
+      setMessage({ type: 'error', text: getPosDataErrorMessage(error), canRetry: true });
       setIsLoading(false);
     });
   }, []);
+
+  const retryLoad = () => {
+    setMessage(null);
+    void Promise.all([loadMeta(), loadStock(search, categoryFilter)]).catch((error: unknown) => {
+      setMessage({ type: 'error', text: getPosDataErrorMessage(error), canRetry: true });
+      setIsLoading(false);
+    });
+  };
 
   const submitSearch = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -239,13 +265,23 @@ export default function PosStockPage() {
       <div className="min-h-0 flex-1 overflow-y-auto p-4 md:p-6">
         {message && (
           <div
-            className={`mb-4 rounded-lg border p-3 text-sm ${
+            className={`mb-4 flex flex-col gap-3 rounded-lg border p-3 text-sm sm:flex-row sm:items-center sm:justify-between ${
               message.type === 'error'
                 ? 'border-error-container bg-error-container text-on-error-container'
                 : 'border-primary-container bg-secondary-container/60 text-on-primary-container'
             }`}
           >
-            {message.text}
+            <span>{message.text}</span>
+            {message.canRetry && (
+              <button
+                type="button"
+                onClick={retryLoad}
+                className="mt-3 inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-on-primary sm:mt-0"
+              >
+                <Icon name="refresh" className="text-[20px]" />
+                Réessayer
+              </button>
+            )}
           </div>
         )}
 

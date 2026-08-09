@@ -1,8 +1,8 @@
 import logo from '../assets/logoLolla.jpg';
-import { categories } from '../data/catalog';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/auth-context';
 import { useCart } from '../contexts/cart-context';
+import { useCatalogCategories } from '../hooks/use-catalog-categories';
 import { Icon } from './Icon';
 
 type HeaderProps = {
@@ -11,6 +11,7 @@ type HeaderProps = {
 };
 
 export function Header({ searchQuery, onSearchChange }: HeaderProps) {
+  const { categories } = useCatalogCategories();
   const navItems = categories.slice(0, 6);
   const { count: cartCount } = useCart();
   const { user } = useAuth();

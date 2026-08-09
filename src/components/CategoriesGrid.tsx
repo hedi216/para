@@ -1,9 +1,13 @@
-import { categories } from '../data/catalog';
 import { Link } from 'react-router-dom';
+import type { Category } from '../data/catalog';
 import { Icon } from './Icon';
 
-export function CategoriesGrid() {
+export function CategoriesGrid({ categories }: { categories: Category[] }) {
   const visibleCategories = categories.slice(0, 4);
+
+  if (!visibleCategories.length) {
+    return null;
+  }
 
   return (
     <section className="section-shell py-24">
