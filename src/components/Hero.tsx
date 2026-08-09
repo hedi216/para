@@ -1,4 +1,5 @@
 import { heroImage } from '../data/catalog';
+import { Link } from 'react-router-dom';
 
 export function Hero() {
   return (
@@ -15,12 +16,12 @@ export function Hero() {
         <p className="mx-auto max-w-xl text-body-lg text-on-surface-variant">
           Découvrez notre sélection pointue de soins dermo-cosmétiques pour une routine parfaite.
         </p>
-        <a
-          href="#catalogue"
+        <Link
+          to="/catalogue"
           className="mt-8 inline-flex rounded-lg bg-primary px-8 py-3 text-label-md font-semibold uppercase tracking-[0.05em] text-on-primary shadow-sm transition-all hover:bg-surface-tint hover:shadow-md"
         >
           Découvrir
-        </a>
+        </Link>
       </div>
     </section>
   );

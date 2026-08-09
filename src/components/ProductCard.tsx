@@ -1,20 +1,12 @@
 import type { Product } from '../data/catalog';
+import { Link } from 'react-router-dom';
+import { formatPrice } from '../lib/currency';
 import { Icon } from './Icon';
 
 type ProductCardProps = {
   product: Product;
   onAddToCart: (product: Product) => void;
 };
-
-const currency = new Intl.NumberFormat('fr-TN', {
-  style: 'currency',
-  currency: 'TND',
-  minimumFractionDigits: 3,
-});
-
-function formatPrice(value: number) {
-  return currency.format(value).replace('TND', 'DT');
-}
 
 export function ProductCard({ product, onAddToCart }: ProductCardProps) {
   const isOutOfStock = product.stock <= 0;
@@ -23,7 +15,7 @@ export function ProductCard({ product, onAddToCart }: ProductCardProps) {
 
   return (
     <article className="group rounded-xl border border-transparent bg-surface p-4 shadow-soft transition-all hover:border-primary-container hover:shadow-soft-lg">
-      <div className="relative mb-4 flex aspect-[4/5] items-center justify-center overflow-hidden rounded-lg bg-surface-container-lowest">
+      <Link to={`/produit/${product.id}`} className="relative mb-4 flex aspect-[4/5] items-center justify-center overflow-hidden rounded-lg bg-surface-container-lowest">
         <img
           className={`h-4/5 object-contain mix-blend-multiply transition-transform duration-300 group-hover:scale-105 ${isOutOfStock ? 'opacity-55 grayscale' : ''}`}
           src={product.image}
@@ -41,10 +33,10 @@ export function ProductCard({ product, onAddToCart }: ProductCardProps) {
             Rupture de stock
           </div>
         )}
-      </div>
+      </Link>
       <div className="space-y-1">
         <p className="text-label-sm font-bold uppercase tracking-wider text-secondary">{product.brand}</p>
-        <h4 className="truncate text-label-md font-semibold text-on-surface">{product.name}</h4>
+        <Link to={`/produit/${product.id}`} className="block truncate text-label-md font-semibold text-on-surface hover:text-primary">{product.name}</Link>
         <div className="flex items-center gap-1 text-tertiary" aria-label={`${product.rating} étoiles sur 5`}>
           {Array.from({ length: 5 }).map((_, index) => {
             const icon = index < fullStars ? 'star' : index === fullStars && hasHalfStar ? 'star_half' : 'star_border';

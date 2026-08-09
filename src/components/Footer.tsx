@@ -1,4 +1,5 @@
 import logo from '../assets/logoLolla.jpg';
+import { Link } from 'react-router-dom';
 import { Icon } from './Icon';
 
 export function Footer() {
@@ -20,9 +21,9 @@ export function Footer() {
           <h4 className="text-label-sm font-bold uppercase tracking-widest text-on-surface">Liens utiles</h4>
           <nav className="flex flex-col gap-2">
             {links.map((link) => (
-              <a key={link} className="text-body-md text-on-secondary-container transition-opacity duration-200 hover:text-primary" href="#">
+              <Link key={link} className="text-body-md text-on-secondary-container transition-opacity duration-200 hover:text-primary" to="/">
                 {link}
-              </a>
+              </Link>
             ))}
           </nav>
         </div>

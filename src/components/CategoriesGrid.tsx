@@ -1,4 +1,5 @@
 import { categories } from '../data/catalog';
+import { Link } from 'react-router-dom';
 import { Icon } from './Icon';
 
 export function CategoriesGrid() {
@@ -26,10 +27,10 @@ export function CategoriesGrid() {
             <div className="absolute inset-0 bg-gradient-to-t from-on-surface/80 via-transparent to-transparent" />
             <div className="absolute bottom-0 left-0 w-full p-6">
               <h3 className="mb-2 font-display text-headline-md text-on-primary">{category.label}</h3>
-              <a className="flex items-center gap-1 text-label-sm font-bold uppercase tracking-widest text-primary-fixed hover:underline" href="#catalogue">
+              <Link className="flex items-center gap-1 text-label-sm font-bold uppercase tracking-widest text-primary-fixed hover:underline" to={`/catalogue?category=${category.id}`}>
                 {index === 0 ? 'Voir la sélection' : index === 1 ? 'Découvrir' : index === 2 ? 'Parcourir' : 'Explorer la tendance'}
                 <Icon name="arrow_forward" className="text-[16px]" />
-              </a>
+              </Link>
             </div>
           </article>
         ))}

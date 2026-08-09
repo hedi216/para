@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: lola-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: lola_parapharmacie
+      POSTGRES_USER: lola
+      POSTGRES_PASSWORD: lola
+    ports:
+      - "5432:5432"
+    volumes:
+      - lola_postgres_data:/var/lib/postgresql/data
+
+volumes:
+  lola_postgres_data:

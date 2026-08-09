@@ -1,4 +1,5 @@
 import { categories, type Product } from '../data/catalog';
+import { Link } from 'react-router-dom';
 import { ProductCard } from './ProductCard';
 
 type ProductSectionProps = {
@@ -19,9 +20,9 @@ export function ProductSection({ products, activeCategory, onCategoryChange, onA
             <h2 className="mb-2 font-display text-headline-lg text-primary">Nos Best-Sellers</h2>
             <p className="text-body-md text-on-surface-variant">Les favoris de nos clients pour une routine infaillible.</p>
           </div>
-          <a className="whitespace-nowrap text-label-sm font-bold uppercase tracking-widest text-primary hover:underline" href="#catalogue">
+          <Link className="whitespace-nowrap text-label-sm font-bold uppercase tracking-widest text-primary hover:underline" to="/catalogue">
             Voir tout
-          </a>
+          </Link>
         </div>
 
         <div className="mb-8 flex gap-2 overflow-x-auto pb-2">
