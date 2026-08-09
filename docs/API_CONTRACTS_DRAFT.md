@@ -11,16 +11,15 @@ Deja implemente :
 - Catalogue public : `GET /products`, `GET /products/:id`, `GET /categories`, `GET /brands`.
 - Auth : `POST /auth/register`, `POST /auth/login`, `GET /auth/me`.
 - Commandes web : `POST /orders`, `GET /orders/my-orders`.
-- POS : `GET /pos/products`, `GET /pos/products/barcode/:barcode`, `POST /pos/sales`, `GET /pos/sales`, `POST /pos/sales/:id/refund`.
+- POS : `GET /pos/products`, `GET /pos/products/barcode/:barcode`, `POST /pos/sales`, `GET /pos/sales`, `GET /pos/sales/:id`, `POST /pos/sales/:id/refund`, `GET /pos/stock`, `POST /pos/stock/adjust`, `GET /pos/customers`, `POST /pos/invoices`, `GET /pos/invoices`, `GET /pos/invoices/:id`.
 - Admin : `GET /admin/dashboard`, `GET /admin/products`, `POST /admin/products`, `PATCH /admin/products/:id`, `GET /admin/orders`, `PATCH /admin/orders/:id/status`, `GET /admin/inventory`, `POST /admin/inventory/adjust`, `GET /admin/clients`.
 
 Encore futur :
 
-- `GET /pos/customers?search=`
 - `GET /admin/staff`
 - `POST /auth/logout` avec revocation serveur
 - pagination/filtres avances sur plusieurs listes
-- module retours complet, fidelite complete et TVA configurable
+- module retours complet, fidelite complete, fiscalisation officielle et TVA configurable
 
 ## Conventions
 
@@ -64,8 +63,14 @@ Toutes les routes POS demandent `EMPLOYEE` ou `ADMIN`.
 | `GET` | `/pos/products/barcode/:barcode` | Implemente | Produit actif exact par code-barres. |
 | `POST` | `/pos/sales` | Implemente | Vente caisse, paiement manuel, caisse, mouvements de stock. |
 | `GET` | `/pos/sales` | Implemente | 100 dernieres ventes caisse. |
+| `GET` | `/pos/sales/:id` | Implemente | Detail complet d'un ticket POS. |
 | `POST` | `/pos/sales/:id/refund` | Implemente simple | Restitue le stock, cree un paiement rembourse et marque la vente `VOIDED`. |
-| `GET` | `/pos/customers?search=` | Futur | Recherche client pour association/fidelite. |
+| `GET` | `/pos/stock?search=` | Implemente | Inventaire POS par produit, marque, SKU ou code-barres. |
+| `POST` | `/pos/stock/adjust` | Implemente | Ajustement stock avec motif obligatoire et mouvement trace. |
+| `GET` | `/pos/customers?search=` | Implemente | Recherche client pour association/fidelite future. |
+| `POST` | `/pos/invoices` | Implemente | Cree une facture interne/proforma v1 depuis un ticket POS. |
+| `GET` | `/pos/invoices` | Implemente | Liste les factures internes POS. |
+| `GET` | `/pos/invoices/:id` | Implemente | Detail facture interne POS. |
 
 Exemple `POST /pos/sales` :
 
@@ -90,6 +95,31 @@ Exemple `POST /pos/sales/:id/refund` :
 ```
 
 Limite v1 refund : pas encore de table `PosRefund`. Une vente remboursee est marquee `VOIDED`, ce qui bloque un second remboursement.
+
+Le ticket POS imprimable est un justificatif client simple, non fiscal officiel. La facture POS v1 est une facture interne/proforma rattachee a `PosSale`; elle stocke les informations client saisies et recopie les lignes dans `InvoiceItem`. La fiscalisation officielle tunisienne reste a valider avant usage legal.
+
+Exemple `POST /pos/stock/adjust` :
+
+```json
+{
+  "productId": "bioderma-photoderm-spf50",
+  "quantity": 3,
+  "reason": "Reception comptoir"
+}
+```
+
+Exemple `POST /pos/invoices` :
+
+```json
+{
+  "posSaleId": "posSaleId",
+  "customerName": "Societe Test",
+  "customerPhone": "22123456",
+  "customerAddress": "Sousse",
+  "taxIdentifier": "MF optionnel",
+  "notes": "Facture interne proforma"
+}
+```
 
 ## Admin
 

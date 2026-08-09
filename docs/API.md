@@ -82,7 +82,14 @@ Les routes POS acceptent `EMPLOYEE` et `ADMIN`.
 | `GET` | `/pos/products/barcode/:barcode` | Produit actif exact par code-barres. |
 | `POST` | `/pos/sales` | Finalise une vente, cree un ticket interne et decremente le stock. Accepte `idempotencyKey`. |
 | `GET` | `/pos/sales` | Dernieres ventes caisse. |
+| `GET` | `/pos/sales/:id` | Detail complet d'un ticket POS. |
 | `POST` | `/pos/sales/:id/refund` | Remboursement simple : remise en stock, paiement rembourse, vente marquee `VOIDED`. |
+| `GET` | `/pos/stock?search=` | Inventaire du magasin pour le POS. Recherche produit, marque, SKU ou code-barres. |
+| `POST` | `/pos/stock/adjust` | Ajustement de stock avec motif obligatoire et `StockMovement`. |
+| `GET` | `/pos/customers?search=` | Recherche client par nom, telephone ou email. |
+| `POST` | `/pos/invoices` | Cree une facture interne/proforma v1 depuis un ticket POS. |
+| `GET` | `/pos/invoices` | Liste les factures internes POS. |
+| `GET` | `/pos/invoices/:id` | Detail d'une facture interne POS. |
 
 Exemple de vente :
 
@@ -98,6 +105,33 @@ Exemple de vente :
 `customerId` est optionnel et doit etre un `CustomerProfile.id`, pas un `User.id`.
 
 Moyens POS actifs : `CASH`, `CARD`.
+
+Le ticket client imprimable est un justificatif POS simple : il contient le ticket, la date, la caisse, l'employe, les lignes, le total, la remise fidelite affichee et la TVA 19 % incluse. Ce n'est pas une facture fiscale officielle.
+
+La facture POS v1 est un document interne/proforma cree depuis un ticket encaisse. Elle reference `PosSale`, recopie les lignes dans `InvoiceItem` et stocke les informations client saisies. La fiscalisation officielle devra etre validee plus tard.
+
+Exemple d'ajustement stock POS :
+
+```json
+{
+  "productId": "bioderma-photoderm-spf50",
+  "quantity": -1,
+  "reason": "Correction inventaire caisse"
+}
+```
+
+Exemple de facture interne POS :
+
+```json
+{
+  "posSaleId": "posSaleId",
+  "customerName": "Client LOLA",
+  "customerPhone": "22123456",
+  "customerAddress": "Sousse",
+  "taxIdentifier": "optionnel",
+  "notes": "Facture interne v1"
+}
+```
 
 ## Garantie de stock v1
 

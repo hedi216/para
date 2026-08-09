@@ -1,23 +1,17 @@
 import { FormEvent, KeyboardEvent, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Icon } from '../components/Icon';
+import { PosShell } from '../components/pos/PosShell';
+import { PrintableTicket } from '../components/pos/PosPrintDocuments';
 import { useAuth } from '../contexts/auth-context';
 import type { Product } from '../data/catalog';
 import { ApiError, apiFetch, createIdempotencyKey } from '../lib/api';
 import { mapApiProduct } from '../lib/catalog';
 import { formatPrice } from '../lib/currency';
-import type { ApiProduct } from '../types/api';
+import type { ApiPosSale, ApiProduct } from '../types/api';
 
 type SaleLine = Product & { quantity: number };
 type PaymentChoice = 'CASH' | 'CARD';
-type PosSale = {
-  id: string;
-  receiptNumber: string;
-  total: number | string;
-  paymentMethod: string;
-  createdAt: string;
-  employee: { firstName: string; lastName: string };
-  register?: { code: string; label: string };
-};
 
 const categoryFilters = [
   { id: 'all', label: 'Tous' },
@@ -27,21 +21,16 @@ const categoryFilters = [
   { id: 'cheveux', label: 'Cheveux' },
 ];
 
-const navItems = [
-  { label: 'Point de vente', icon: 'point_of_sale', active: true },
-  { label: 'Commandes', icon: 'receipt_long' },
-  { label: 'Gestion stock', icon: 'inventory_2' },
-  { label: 'Recherche client', icon: 'person_search' },
-];
-
 export default function PosPage() {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState('all');
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<SaleLine[]>([]);
   const [paymentMethod, setPaymentMethod] = useState<PaymentChoice>('CASH');
-  const [sales, setSales] = useState<PosSale[]>([]);
+  const [sales, setSales] = useState<ApiPosSale[]>([]);
+  const [lastSale, setLastSale] = useState<ApiPosSale | null>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
   const [isFinalizing, setIsFinalizing] = useState(false);
@@ -68,7 +57,7 @@ export default function PosPage() {
     }
   };
 
-  const loadSales = () => apiFetch<PosSale[]>('/pos/sales').then(setSales).catch(() => undefined);
+  const loadSales = () => apiFetch<ApiPosSale[]>('/pos/sales').then(setSales).catch(() => undefined);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -117,6 +106,7 @@ export default function PosPage() {
   const resetTransaction = () => {
     setCart([]);
     setPaymentMethod('CASH');
+    setLastSale(null);
     setMessage({ type: 'info', text: 'Nouvelle transaction prête.' });
   };
 
@@ -155,7 +145,7 @@ export default function PosPage() {
     setMessage(null);
     setIsFinalizing(true);
     try {
-      const sale = await apiFetch<PosSale>('/pos/sales', {
+      const sale = await apiFetch<ApiPosSale>('/pos/sales', {
         method: 'POST',
         body: JSON.stringify({
           idempotencyKey: createIdempotencyKey('pos-sale'),
@@ -165,6 +155,8 @@ export default function PosPage() {
         }),
       });
       setCart([]);
+      setSearch('');
+      setLastSale(sale);
       setMessage({ type: 'success', text: `Ticket ${sale.receiptNumber} encaissé avec succès.` });
       await Promise.all([loadProducts(''), loadSales()]);
     } catch (error) {
@@ -175,40 +167,9 @@ export default function PosPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-on-background lg:h-screen lg:overflow-hidden">
-      <div className="flex min-h-screen flex-col lg:h-screen lg:flex-row lg:overflow-hidden">
-        <aside className="flex shrink-0 flex-col bg-inverse-surface px-4 py-5 text-inverse-on-surface lg:h-screen lg:w-64 lg:px-6 lg:py-7">
-          <div>
-            <h1 className="font-display text-[30px] font-bold leading-tight text-primary-fixed">LOLA POS</h1>
-            <p className="mt-1 text-sm text-inverse-on-surface/35">Branche Sousse</p>
-          </div>
-
-          <nav className="mt-6 flex gap-2 overflow-x-auto pb-1 lg:mt-10 lg:flex-col lg:gap-4 lg:overflow-visible lg:pb-0">
-            {navItems.map((item) => (
-              <button
-                key={item.label}
-                className={`flex shrink-0 items-center gap-3 rounded-lg px-4 py-3 text-left text-sm font-semibold tracking-[0.05em] transition ${
-                  item.active
-                    ? 'bg-primary-container text-on-primary-container'
-                    : 'text-inverse-on-surface/25 hover:bg-inverse-on-surface/10 hover:text-inverse-on-surface/65'
-                }`}
-              >
-                <Icon name={item.icon} filled={item.active} className="text-[23px]" />
-                <span>{item.label}</span>
-              </button>
-            ))}
-          </nav>
-
-          <button
-            type="button"
-            onClick={resetTransaction}
-            className="mt-5 min-h-12 rounded-lg bg-primary px-4 text-sm font-bold tracking-[0.04em] text-on-primary shadow-sm transition hover:opacity-95 lg:mt-auto"
-          >
-            Nouvelle transaction
-          </button>
-        </aside>
-
-        <main className="flex min-w-0 flex-1 flex-col bg-surface lg:h-screen lg:overflow-hidden">
+    <>
+      <div className="print:hidden">
+        <PosShell onNewTransaction={resetTransaction}>
           <header className="flex min-h-20 shrink-0 flex-col gap-4 border-b border-outline-variant bg-surface-container-lowest px-4 py-4 md:flex-row md:items-center md:justify-between md:px-6">
             <form onSubmit={handleSearchSubmit} className="relative w-full max-w-[840px]">
               <Icon name="search" className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[27px] text-outline" />
@@ -217,7 +178,7 @@ export default function PosPage() {
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 onKeyDown={handleSearchKeyDown}
-                placeholder="Rechercher ou scanner un produit (Code-barres)..."
+                placeholder="Rechercher ou scanner un produit (code-barres)..."
                 className="min-h-14 w-full rounded-lg border border-outline-variant bg-surface-container-lowest pl-12 pr-4 text-base text-on-surface shadow-sm outline-none transition focus:border-primary focus:ring-1 focus:ring-primary"
               />
             </form>
@@ -265,13 +226,23 @@ export default function PosPage() {
 
               {message && (
                 <div
-                  className={`mt-4 rounded-lg border px-4 py-3 text-sm ${
+                  className={`mt-4 flex flex-col gap-3 rounded-lg border px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between ${
                     message.type === 'error'
                       ? 'border-error-container bg-error-container text-on-error-container'
                       : 'border-primary-container bg-secondary-container/60 text-on-primary-container'
                   }`}
                 >
-                  {message.text}
+                  <span>{message.text}</span>
+                  {lastSale && message.type === 'success' && (
+                    <button
+                      type="button"
+                      onClick={() => window.print()}
+                      className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-on-primary"
+                    >
+                      <Icon name="print" className="text-[20px]" />
+                      Imprimer ticket
+                    </button>
+                  )}
                 </div>
               )}
 
@@ -295,7 +266,7 @@ export default function PosPage() {
                   </div>
                 ) : (
                   <div className="rounded-xl border border-dashed border-outline-variant bg-surface-container-lowest p-8 text-center text-on-surface-variant">
-            Aucun produit trouvé pour cette recherche.
+                    Aucun produit trouvé pour cette recherche.
                   </div>
                 )}
               </div>
@@ -309,15 +280,19 @@ export default function PosPage() {
               paymentMethod={paymentMethod}
               isFinalizing={isFinalizing}
               recentSales={sales}
+              lastSale={lastSale}
               onPaymentChange={setPaymentMethod}
               onQuantityChange={updateQuantity}
               onRemoveLine={removeLine}
               onFinalize={finalizeSale}
+              onPrintLastSale={() => window.print()}
+              onCustomerLookup={() => navigate('/pos/customers')}
             />
           </div>
-        </main>
+        </PosShell>
       </div>
-    </div>
+      <PrintableTicket sale={lastSale} />
+    </>
   );
 }
 
@@ -368,10 +343,13 @@ function TicketPanel({
   paymentMethod,
   isFinalizing,
   recentSales,
+  lastSale,
   onPaymentChange,
   onQuantityChange,
   onRemoveLine,
   onFinalize,
+  onPrintLastSale,
+  onCustomerLookup,
 }: {
   cart: SaleLine[];
   subtotal: number;
@@ -379,17 +357,21 @@ function TicketPanel({
   total: number;
   paymentMethod: PaymentChoice;
   isFinalizing: boolean;
-  recentSales: PosSale[];
+  recentSales: ApiPosSale[];
+  lastSale: ApiPosSale | null;
   onPaymentChange: (method: PaymentChoice) => void;
   onQuantityChange: (id: string, quantity: number) => void;
   onRemoveLine: (id: string) => void;
   onFinalize: () => void;
+  onPrintLastSale: () => void;
+  onCustomerLookup: () => void;
 }) {
   return (
     <aside className="flex shrink-0 flex-col border-t border-outline-variant bg-surface-container-lowest shadow-[-4px_0_24px_rgba(45,71,57,0.03)] lg:w-[400px] lg:border-l lg:border-t-0">
       <div className="border-b border-outline-variant p-4">
         <button
           type="button"
+          onClick={onCustomerLookup}
           className="group flex min-h-16 w-full items-center justify-between rounded-lg border border-dashed border-outline-variant bg-surface-container-low px-4 py-3 transition hover:bg-secondary-container"
         >
           <span className="flex items-center gap-3">
@@ -435,6 +417,21 @@ function TicketPanel({
           </div>
         )}
 
+        {lastSale && (
+          <div className="rounded-lg border border-primary-container bg-secondary-container/70 p-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-primary">Ticket prêt</p>
+            <p className="mt-1 text-sm font-semibold text-on-surface">{lastSale.receiptNumber}</p>
+            <button
+              type="button"
+              onClick={onPrintLastSale}
+              className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-on-primary"
+            >
+              <Icon name="print" className="text-[20px]" />
+              Imprimer ticket
+            </button>
+          </div>
+        )}
+
         {recentSales.length > 0 && (
           <p className="pt-1 text-[11px] text-on-surface-variant">Dernier ticket : {recentSales[0].receiptNumber}</p>
         )}
@@ -447,11 +444,11 @@ function TicketPanel({
             <span>{formatPrice(subtotal)}</span>
           </div>
           <div className="flex justify-between text-sm text-tertiary">
-            <span>Remise (Fidélité)</span>
+            <span>Remise fidélité</span>
             <span>- {formatPrice(loyaltyDiscount)}</span>
           </div>
           <div className="flex justify-between border-t border-outline-variant/50 pt-2 text-sm text-on-surface-variant">
-            <span>TVA (19%)</span>
+            <span>TVA 19% incluse</span>
             <span>Inclus</span>
           </div>
         </div>

@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsArray, IsEnum, IsInt, IsOptional, IsString, Min, ValidateNested } from 'class-validator';
+import { IsArray, IsEnum, IsInt, IsNotEmpty, IsOptional, IsString, Min, MinLength, ValidateNested } from 'class-validator';
 import { PaymentMethod } from '@prisma/client';
 
 export class PosSaleItemDto {
@@ -57,4 +57,46 @@ export class RefundPosSaleDto {
 
   @IsEnum(PaymentMethod)
   paymentMethod!: PaymentMethod;
+}
+
+export class PosStockAdjustDto {
+  @IsString()
+  productId!: string;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(-100000)
+  quantity!: number;
+
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(3)
+  reason!: string;
+}
+
+export class CreatePosInvoiceDto {
+  @IsString()
+  posSaleId!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(2)
+  customerName!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  customerPhone!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(3)
+  customerAddress!: string;
+
+  @IsOptional()
+  @IsString()
+  taxIdentifier?: string;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
 }

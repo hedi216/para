@@ -13,7 +13,11 @@ import CartPage from './pages/CartPage';
 import CataloguePage from './pages/CataloguePage';
 import CheckoutPage from './pages/CheckoutPage';
 import HomePage from './pages/HomePage';
+import PosCustomersPage from './pages/PosCustomersPage';
+import PosInvoicesPage from './pages/PosInvoicesPage';
+import PosOrdersPage from './pages/PosOrdersPage';
 import PosPage from './pages/PosPage';
+import PosStockPage from './pages/PosStockPage';
 import ProductPage from './pages/ProductPage';
 
 export default function App() {
@@ -36,6 +40,10 @@ export default function App() {
             <Route path="admin/commandes" element={<RequireRole roles={['ADMIN']}><AdminOrdersPage /></RequireRole>} />
             <Route path="admin/clients" element={<RequireRole roles={['ADMIN']}><AdminClientsPage /></RequireRole>} />
             <Route path="pos" element={<RequireRole roles={['EMPLOYEE', 'ADMIN']}><PosPage /></RequireRole>} />
+            <Route path="pos/orders" element={<RequireRole roles={['EMPLOYEE', 'ADMIN']}><PosOrdersPage /></RequireRole>} />
+            <Route path="pos/stock" element={<RequireRole roles={['EMPLOYEE', 'ADMIN']}><PosStockPage /></RequireRole>} />
+            <Route path="pos/customers" element={<RequireRole roles={['EMPLOYEE', 'ADMIN']}><PosCustomersPage /></RequireRole>} />
+            <Route path="pos/invoices" element={<RequireRole roles={['EMPLOYEE', 'ADMIN']}><PosInvoicesPage /></RequireRole>} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </CartProvider>

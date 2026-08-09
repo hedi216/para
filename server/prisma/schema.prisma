@@ -312,6 +312,7 @@ model PosSale {
   items          PosSaleItem[]
   payments       Payment[]
   stockMovements StockMovement[]
+  invoice        Invoice?
 
   @@unique([registerId, idempotencyKey])
   @@index([employeeId, createdAt])
@@ -332,4 +333,36 @@ model PosSaleItem {
   product     Product @relation(fields: [productId], references: [id])
 
   @@index([posSaleId])
+}
+
+model Invoice {
+  id              String        @id @default(cuid())
+  invoiceNumber   String        @unique
+  posSaleId       String        @unique
+  customerName    String
+  customerPhone   String
+  customerAddress String
+  taxIdentifier   String?
+  subtotal        Decimal       @db.Decimal(10, 3)
+  taxTotal        Decimal?      @db.Decimal(10, 3)
+  total           Decimal       @db.Decimal(10, 3)
+  notes           String?
+  createdAt       DateTime      @default(now())
+  posSale         PosSale       @relation(fields: [posSaleId], references: [id])
+  items           InvoiceItem[]
+
+  @@index([createdAt])
+}
+
+model InvoiceItem {
+  id          String  @id @default(cuid())
+  invoiceId   String
+  productName String
+  brandName   String
+  quantity    Int
+  unitPrice   Decimal @db.Decimal(10, 3)
+  lineTotal   Decimal @db.Decimal(10, 3)
+  invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
 }

@@ -3,7 +3,7 @@ import { PaymentMethod, PaymentStatus, Prisma, SaleStatus, StockMovementType } f
 import { PrismaService } from '../database/prisma.service';
 import { InventoryService } from '../inventory/inventory.service';
 import { ProductsService } from '../products/products.service';
-import { CreatePosSaleDto, RefundPosSaleDto } from './dto/pos-sale.dto';
+import { CreatePosInvoiceDto, CreatePosSaleDto, PosStockAdjustDto, RefundPosSaleDto } from './dto/pos-sale.dto';
 
 const posSaleInclude = {
   employee: { select: { firstName: true, lastName: true, email: true } },
@@ -11,7 +11,19 @@ const posSaleInclude = {
   register: true,
   items: true,
   payments: true,
+  invoice: { select: { id: true, invoiceNumber: true } },
 } satisfies Prisma.PosSaleInclude;
+
+const invoiceInclude = {
+  items: true,
+  posSale: {
+    include: {
+      employee: { select: { firstName: true, lastName: true, email: true } },
+      register: true,
+      payments: true,
+    },
+  },
+} satisfies Prisma.InvoiceInclude;
 
 @Injectable()
 export class PosService {
@@ -119,6 +131,152 @@ export class PosService {
       include: posSaleInclude,
       orderBy: { createdAt: 'desc' },
       take: 100,
+    });
+  }
+
+  async findOne(id: string) {
+    const sale = await this.prisma.posSale.findUnique({
+      where: { id },
+      include: posSaleInclude,
+    });
+    if (!sale) {
+      throw new NotFoundException('Vente POS introuvable.');
+    }
+    return sale;
+  }
+
+  async getStock(search?: string) {
+    const query = search?.trim().toLocaleLowerCase('fr-FR');
+    const items = await this.inventory.findAll();
+    if (!query) {
+      return items;
+    }
+
+    return items.filter((item) => {
+      const haystack = [
+        item.product.name,
+        item.product.sku,
+        item.product.barcode,
+        item.product.brand.name,
+        item.product.category.name,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLocaleLowerCase('fr-FR');
+      return haystack.includes(query);
+    });
+  }
+
+  adjustStock(dto: PosStockAdjustDto, employeeId: string) {
+    const reason = dto.reason.trim();
+    if (!reason) {
+      throw new BadRequestException('Le motif d ajustement est obligatoire.');
+    }
+    return this.inventory.adjust({ productId: dto.productId, quantity: dto.quantity, reason }, employeeId);
+  }
+
+  async getCustomers(search?: string) {
+    const query = search?.trim();
+    const customers = await this.prisma.customerProfile.findMany({
+      where: query
+        ? {
+            OR: [
+              { user: { firstName: { contains: query, mode: 'insensitive' } } },
+              { user: { lastName: { contains: query, mode: 'insensitive' } } },
+              { user: { email: { contains: query, mode: 'insensitive' } } },
+              { user: { phone: { contains: query, mode: 'insensitive' } } },
+            ],
+          }
+        : {},
+      include: {
+        user: { select: { id: true, email: true, firstName: true, lastName: true, phone: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    });
+
+    return customers.map((customer) => ({
+      id: customer.id,
+      userId: customer.userId,
+      firstName: customer.user.firstName,
+      lastName: customer.user.lastName,
+      email: customer.user.email,
+      phone: customer.user.phone,
+      loyaltyPoints: customer.loyaltyPoints,
+      defaultAddress: customer.defaultAddress,
+      city: customer.city,
+    }));
+  }
+
+  async findInvoices() {
+    return this.prisma.invoice.findMany({
+      include: invoiceInclude,
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
+  }
+
+  async findInvoice(id: string) {
+    const invoice = await this.prisma.invoice.findUnique({
+      where: { id },
+      include: invoiceInclude,
+    });
+    if (!invoice) {
+      throw new NotFoundException('Facture POS introuvable.');
+    }
+    return invoice;
+  }
+
+  async createInvoice(dto: CreatePosInvoiceDto) {
+    return this.prisma.$transaction(async (tx) => {
+      const existing = await tx.invoice.findUnique({
+        where: { posSaleId: dto.posSaleId },
+        include: invoiceInclude,
+      });
+      if (existing) {
+        throw new BadRequestException('Une facture existe deja pour ce ticket.');
+      }
+
+      const sale = await tx.posSale.findUnique({
+        where: { id: dto.posSaleId },
+        include: { items: true },
+      });
+      if (!sale) {
+        throw new NotFoundException('Ticket POS introuvable.');
+      }
+      if (sale.status !== SaleStatus.COMPLETED) {
+        throw new BadRequestException('Seul un ticket encaisse peut etre converti en facture interne.');
+      }
+
+      const total = Number(sale.total);
+      const subtotal = Number(sale.subtotal);
+      const includedTax = Number((total - total / 1.19).toFixed(3));
+      const invoiceNumber = `FAC-${Date.now()}-${Math.floor(Math.random() * 900 + 100)}`;
+
+      return tx.invoice.create({
+        data: {
+          invoiceNumber,
+          posSaleId: sale.id,
+          customerName: dto.customerName.trim(),
+          customerPhone: dto.customerPhone.trim(),
+          customerAddress: dto.customerAddress.trim(),
+          taxIdentifier: dto.taxIdentifier?.trim() || undefined,
+          subtotal,
+          taxTotal: includedTax,
+          total,
+          notes: dto.notes?.trim() || undefined,
+          items: {
+            create: sale.items.map((item) => ({
+              productName: item.productName,
+              brandName: item.brandName,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+              lineTotal: item.lineTotal,
+            })),
+          },
+        },
+        include: invoiceInclude,
+      });
     });
   }
 

@@ -7,79 +7,90 @@
 - `C:\Users\marzo\Downloads\LOLA POS\POSDESIGN.md`
 - `C:\Users\marzo\Downloads\DESIGN.md`
 
-La capture et le HTML représentent une caisse de comptoir sur écran large. Le modèle visuel est fonctionnel et dense : navigation sombre fixe, zone catalogue centrale claire, ticket de caisse persistant à droite. La capture doit primer sur les classes `dark` présentes dans le HTML : elle montre une interface claire avec uniquement la barre latérale sombre.
+La capture Stitch représente une caisse de comptoir sur écran large. Le modèle visuel reste la référence : navigation sombre fixe, catalogue central clair, ticket persistant à droite. La capture prime sur les variantes de classes du HTML.
 
 ## Écran principal de caisse
 
-| Zone | Contenu Stitch | Conséquence produit |
+| Zone | Contenu Stitch | Implémentation v1 |
 | --- | --- | --- |
-| Barre latérale | LOLA POS, branche Sousse, Point of Sale actif, bouton `New Transaction` | Une session de vente doit pouvoir être réinitialisée sans altérer le stock. |
-| Entête | Recherche, alerte, employée connectée, `Caisse 01` | La vente doit connaître la caisse et l'employé connecté. |
-| Catalogue | Filtres catégories, grille de produits, ajout rapide | Recherche et filtres doivent rester dans la vue de caisse. |
-| Ticket | Client facultatif, lignes, quantités, suppression, totaux, paiement | Le panier de caisse reste un brouillon distinct de la vente finalisée. |
+| Sidebar | Logo LOLA, `LOLA POS`, branche Sousse, navigation sombre | Sidebar React partagée avec liens fonctionnels et contraste renforcé. |
+| Navigation | Point de vente, Commandes, Gestion stock, Recherche client | Routes `/pos`, `/pos/orders`, `/pos/stock`, `/pos/customers`, plus `/pos/invoices`. |
+| Nouvelle transaction | Bouton en bas de sidebar | Remet le panier POS à zéro sans mouvement de stock. |
+| Topbar caisse | Recherche / scan code-barres, notification, employé connecté, `Caisse 01` | Recherche produit, scan barcode et rattachement à l'employé authentifié. |
+| Catalogue | Filtres catégories, cartes produits, stock visible, bouton `+` | Produits chargés depuis `/pos/products`, ajout bloqué si stock insuffisant. |
+| Ticket | Client facultatif, lignes panier, remise fidélité, TVA 19 %, paiement espèces/carte | Vente finalisée via `/pos/sales`, ticket imprimable après encaissement. |
 
 ## Fonctionnalités extraites
 
 ### Recherche et scan code-barres
 
-Le champ principal porte le libellé `Rechercher ou scanner un produit (Code-barres)...`. Il implique :
-
-- recherche par nom, marque, SKU et code-barres via `GET /pos/products?search=`;
-- résolution directe d'un code complet via `GET /pos/products/barcode/:barcode`;
-- ajout immédiat au ticket après un scan réussi ;
-- message clair si le code est absent ou si le stock est insuffisant.
+- Recherche par nom, marque, SKU et code-barres via `GET /pos/products?search=`.
+- Scan direct via `GET /pos/products/barcode/:barcode`.
+- Ajout immédiat au ticket après un scan réussi.
+- Message clair si le code est absent ou si le stock est insuffisant.
 
 ### Catégories et cartes produit
 
-Les filtres visibles sont `Tous`, `Visage`, `Solaire`, `Corps`, `Cheveux`. Chaque carte produit contient image, marque, nom, prix en DT, bouton `+` et badge de stock (`Stock: 42`, `Stock: 3`). Le badge rouge est un signal de stock faible.
+Les filtres visibles restent `Tous`, `Visage`, `Solaire`, `Corps`, `Cheveux`. Chaque carte conserve image, marque, nom, prix en DT, stock visible et bouton d'ajout rapide.
 
 ### Panier caisse
 
-Le ticket de droite présente :
+Le ticket de droite conserve :
 
 - `Associer un client` ;
-- lignes avec image, libellé, suppression, boutons moins/plus, quantité et prix ;
-- sous-total avec nombre d'articles ;
-- `Remise (Fidélité)` ;
+- lignes avec image, suppression, quantité moins/plus et prix ;
+- sous-total ;
+- remise fidélité affichée à `0,000 DT` tant que le moteur fidélité n'est pas branché ;
 - TVA 19 % incluse ;
-- total en DT ;
+- total ;
 - paiement `Espèces` ou `Carte` ;
-- action finale `Encaisser`.
+- action `Encaisser`.
 
-La remise fidélité reste affichée à `0,000 DT` tant que le moteur fidélité n'est pas implémenté côté backend.
+### Ticket client imprimable
 
-### Encaissement
+Après encaissement, le POS affiche `Imprimer ticket`. Le ticket imprimable contient LOLA Parapharmacie, Sousse, numéro ticket, date, caisse, employé, lignes produits, quantités, prix, sous-total, remise, TVA incluse, total et mode de paiement.
 
-`Encaisser` doit rester atomique : création de la vente, de ses lignes, du paiement, du ticket interne et des mouvements de stock dans une seule transaction. L'interface est verrouillée pendant la requête et affiche le numéro de ticket final.
+Important : ce ticket est un justificatif client POS simple. Ce n'est pas une facture fiscale officielle.
 
-### Contexte opérateur
+### Facture interne / proforma v1
 
-La maquette affiche l'employée connectée et `Caisse 01`. En v1, chaque vente envoie `registerId: "CAISSE-01"` et le backend rattache la vente à l'employé authentifié.
+L'écran `/pos/invoices` permet de convertir un ticket encaissé en facture interne/proforma v1. Le formulaire demande nom client ou société, téléphone, adresse, matricule fiscal optionnel et notes. La facture référence `PosSale` et recopie les lignes dans `InvoiceItem`.
 
-## Menus présents et périmètre futur
+La fiscalisation officielle devra être validée juridiquement et techniquement avant de présenter ce document comme facture légale.
 
-| Menu | État dans Stitch | Périmètre cible |
-| --- | --- | --- |
-| Point de vente | Écran détaillé intégré | Vente, panier, paiement, ticket. |
-| Commandes | Lien visuel v1 | Historique, annulation contrôlée, retours. |
-| Gestion stock | Lien visuel v1 | Consultation, mouvements, réceptions et ajustements. |
-| Recherche client | Lien visuel v1 | Recherche client, historique, fidélité et association au ticket. |
+### Gestion stock POS
 
-## Décision d'intégration React
+L'écran `/pos/stock` permet de rechercher un produit, consulter stock actuel et seuil faible, puis ajuster le stock avec une quantité positive ou négative et un motif obligatoire. L'ajustement passe par `/pos/stock/adjust` et crée un `StockMovement`.
 
-La page `/pos` utilise maintenant un layout dédié plein écran, sans `BackOfficeShell`, pour respecter la capture Stitch : barre latérale sombre fixe, entête scan/recherche, grille produits centrale et ticket persistant à droite sur desktop.
+En v1, la route est accessible à `EMPLOYEE` et `ADMIN`. Des permissions fines devront distinguer consultation, ajustement et validation d'inventaire.
 
-Sur mobile et tablette étroite, le ticket passe sous la grille pour éviter les chevauchements. Les menus secondaires sont conservés visuellement mais restent hors périmètre fonctionnel v1. `Nouvelle transaction` remet le panier POS à zéro sans modifier le stock.
+### Recherche client
+
+L'écran `/pos/customers` recherche les clients par nom, téléphone ou email. Il affiche nom complet, téléphone, email et points fidélité. Le bouton `Sélectionner` prépare l'association future au ticket mais ne déclenche pas encore de remise réelle.
+
+## Encaissement
+
+`Encaisser` reste atomique : création de la vente, des lignes, du paiement, du ticket interne et des mouvements de stock dans une transaction backend. L'interface bloque le bouton pendant la requête et recharge le stock après succès.
+
+## Contexte opérateur
+
+La maquette affiche l'employé connecté et `Caisse 01`. En v1, chaque vente envoie `registerId: "CAISSE-01"` et le backend rattache la vente à l'utilisateur authentifié.
 
 ## Design system commun
 
-POS utilise le même système LOLA que le web et l'Admin : `primary #44664f`, `primary-container #8fb399`, `background #faf9f6`, `secondary-container #e8e2d6`, avec `Libre Caslon Text` pour les titres et `Manrope` pour les données/actions.
+Le POS utilise le même design system LOLA que le web et l'Admin :
+
+- `primary #44664f`
+- `primary-container #8fb399`
+- `background #faf9f6`
+- `secondary-container #e8e2d6`
+- typographies `Libre Caslon Text` et `Manrope`
 
 ## Limites restantes
 
 - Pas de mode offline.
-- Pas d'imprimante ticket.
-- Pas de recherche client complète.
-- Pas de fidélité réelle.
-- Pas de retours avancés ni clôture caisse.
+- Pas d'intégration imprimante ticket native.
+- Pas de fidélité réelle ni règles promotionnelles POS.
+- Pas de retours avancés, avoirs, clôture caisse ou Z de caisse.
+- Pas de fiscalisation officielle des factures.
 - Les images produits restent celles du catalogue actuel.
