@@ -7,74 +7,79 @@
 - `C:\Users\marzo\Downloads\LOLA POS\POSDESIGN.md`
 - `C:\Users\marzo\Downloads\DESIGN.md`
 
-La capture et le HTML représentent une caisse de comptoir sur écran large. Le modèle visuel est très fonctionnel : navigation sombre fixe, zone catalogue centrale claire, ticket de caisse persistant à droite. La capture doit primer sur les classes `dark` présentes dans le HTML : elle montre une interface claire avec uniquement la barre latérale sombre.
+La capture et le HTML représentent une caisse de comptoir sur écran large. Le modèle visuel est fonctionnel et dense : navigation sombre fixe, zone catalogue centrale claire, ticket de caisse persistant à droite. La capture doit primer sur les classes `dark` présentes dans le HTML : elle montre une interface claire avec uniquement la barre latérale sombre.
 
 ## Écran principal de caisse
 
 | Zone | Contenu Stitch | Conséquence produit |
 | --- | --- | --- |
-| Barre latérale | LOLA POS, agence Sousse, Point of Sale actif, bouton `New Transaction` | Une session de vente doit pouvoir être abandonnée ou réinitialisée sans altérer le stock. |
-| Entête | Recherche, alerte, employée `Marie Dupont`, `Caisse 01` | La vente doit connaître le poste/caisse et l’employé connecté. |
-| Catalogue | Filtres catégories, grille de produits, ajout rapide | Recherche et filtres ne doivent jamais quitter la vue de caisse. |
-| Ticket | Client facultatif, lignes, quantités, suppression, totaux, paiement | Le panier de caisse est un brouillon, distinct de la vente finalisée. |
+| Barre latérale | LOLA POS, branche Sousse, Point of Sale actif, bouton `New Transaction` | Une session de vente doit pouvoir être réinitialisée sans altérer le stock. |
+| Entête | Recherche, alerte, employée connectée, `Caisse 01` | La vente doit connaître la caisse et l'employé connecté. |
+| Catalogue | Filtres catégories, grille de produits, ajout rapide | Recherche et filtres doivent rester dans la vue de caisse. |
+| Ticket | Client facultatif, lignes, quantités, suppression, totaux, paiement | Le panier de caisse reste un brouillon distinct de la vente finalisée. |
 
 ## Fonctionnalités extraites
 
 ### Recherche et scan code-barres
 
-Le champ principal porte le libellé « Rechercher ou scanner un produit (Code-barres)... ». Il implique un endpoint optimisé pour :
+Le champ principal porte le libellé `Rechercher ou scanner un produit (Code-barres)...`. Il implique :
 
-- la recherche par nom, marque, SKU et code-barres ;
-- une résolution directe quand un scanner USB saisit un code complet suivi d’Entrée ;
-- le retour d’un message clair pour un code absent ou un article sans stock ;
-- l’ajout immédiat au panier après un scan réussi, sans ouvrir une fiche produit.
+- recherche par nom, marque, SKU et code-barres via `GET /pos/products?search=`;
+- résolution directe d'un code complet via `GET /pos/products/barcode/:barcode`;
+- ajout immédiat au ticket après un scan réussi ;
+- message clair si le code est absent ou si le stock est insuffisant.
 
 ### Catégories et cartes produit
 
-Les filtres visibles sont `Tous`, `Visage`, `Solaire`, `Corps`, `Cheveux`. Chaque carte produit contient image, marque, nom, prix DT, bouton d’ajout et badge de stock (`Stock: 42`, `Stock: 3`). Le badge rouge constitue un signal de stock faible, non seulement une décoration.
-
-À l’intégration, les catégories devront venir du même référentiel que le web. Les cartes devront recevoir le stock disponible pour la caisse sélectionnée, et désactiver l’ajout quand il est nul.
+Les filtres visibles sont `Tous`, `Visage`, `Solaire`, `Corps`, `Cheveux`. Chaque carte produit contient image, marque, nom, prix en DT, bouton `+` et badge de stock (`Stock: 42`, `Stock: 3`). Le badge rouge est un signal de stock faible.
 
 ### Panier caisse
 
 Le ticket de droite présente :
 
-- une action `Associer un client` ;
-- des lignes avec image, libellé, suppression, boutons moins/plus, quantité et prix ;
-- le sous-total avec nombre d’articles ;
-- une `Remise (Fidélité)` ;
-- une TVA de 19 % incluse ;
-- le total en DT ;
-- les moyens `Espèces` et `Carte` ;
-- l’action finale `Encaisser`.
+- `Associer un client` ;
+- lignes avec image, libellé, suppression, boutons moins/plus, quantité et prix ;
+- sous-total avec nombre d'articles ;
+- `Remise (Fidélité)` ;
+- TVA 19 % incluse ;
+- total en DT ;
+- paiement `Espèces` ou `Carte` ;
+- action finale `Encaisser`.
 
-La remise fidélité doit être calculée côté serveur à partir d’une règle versionnée. Elle ne doit pas être une simple valeur modifiable par le navigateur. Les prix et montants doivent être conservés en millimes TND (trois décimales) ou `Decimal` côté API/base.
+La remise fidélité reste affichée à `0,000 DT` tant que le moteur fidélité n'est pas implémenté côté backend.
 
 ### Encaissement
 
-`Encaisser` doit être atomique : création de la vente, de ses lignes, du paiement, du ticket interne et des mouvements de stock dans une seule transaction. Un double clic ou une reprise réseau ne doit pas générer deux tickets. L’interface devra être verrouillée pendant la confirmation et afficher le numéro de ticket final.
+`Encaisser` doit rester atomique : création de la vente, de ses lignes, du paiement, du ticket interne et des mouvements de stock dans une seule transaction. L'interface est verrouillée pendant la requête et affiche le numéro de ticket final.
 
 ### Contexte opérateur
 
-La maquette affiche l’employée connectée et `Caisse 01`. En v1, une caisse est un registre attaché à un point de vente. Chaque vente doit donc enregistrer au minimum `storeId`, `registerId`, `employeeId` et l’horodatage.
+La maquette affiche l'employée connectée et `Caisse 01`. En v1, chaque vente envoie `registerId: "CAISSE-01"` et le backend rattache la vente à l'employé authentifié.
 
 ## Menus présents et périmètre futur
 
 | Menu | État dans Stitch | Périmètre cible |
 | --- | --- | --- |
-| Point of Sale | Écran détaillé | Vente, panier, paiement, ticket. |
-| Orders | Lien de navigation | Historique, annulation contrôlée, retours. |
-| Stock Management | Lien de navigation | Consultation, mouvements, réceptions et ajustements. |
-| Customer Lookup | Lien de navigation | Recherche client, historique, fidélité et association au ticket. |
+| Point de vente | Écran détaillé intégré | Vente, panier, paiement, ticket. |
+| Commandes | Lien visuel v1 | Historique, annulation contrôlée, retours. |
+| Gestion stock | Lien visuel v1 | Consultation, mouvements, réceptions et ajustements. |
+| Recherche client | Lien visuel v1 | Recherche client, historique, fidélité et association au ticket. |
+
+## Décision d'intégration React
+
+La page `/pos` utilise maintenant un layout dédié plein écran, sans `BackOfficeShell`, pour respecter la capture Stitch : barre latérale sombre fixe, entête scan/recherche, grille produits centrale et ticket persistant à droite sur desktop.
+
+Sur mobile et tablette étroite, le ticket passe sous la grille pour éviter les chevauchements. Les menus secondaires sont conservés visuellement mais restent hors périmètre fonctionnel v1. `Nouvelle transaction` remet le panier POS à zéro sans modifier le stock.
 
 ## Design system commun
 
-POS utilise le même système LOLA que le web et l’Admin : `primary #44664f`, `primary-container #8fb399`, `background #faf9f6`, `secondary-container #e8e2d6`, avec `Libre Caslon Text` pour les titres et `Manrope` pour les données/actions. Pour ce contexte dense, les guides demandent surtout `body-md` et `label-sm`, des tableaux sobres et des marges de 24 à 40 px.
+POS utilise le même système LOLA que le web et l'Admin : `primary #44664f`, `primary-container #8fb399`, `background #faf9f6`, `secondary-container #e8e2d6`, avec `Libre Caslon Text` pour les titres et `Manrope` pour les données/actions.
 
-## Points à corriger lors de l’intégration
+## Limites restantes
 
-- Le HTML Stitch doit subir un audit d’encodage : des chaînes copiées peuvent présenter du mojibake selon la source/lecture.
-- Les images et avatars sont des URLs externes Stitch ; il faudra les remplacer par des images produit administrées et un avatar neutre ou interne.
-- Plusieurs textes restent anglais (`Point of Sale`, `Orders`, `Stock Management`, `Customer Lookup`, `New Transaction`, `Sousse Branch`) ; décider avec le client si l’outil devient 100 % français.
-- Les produits, stocks, cliente, remise et montants visibles sont des données mockées.
-- La règle de remise fidélité, la TVA applicable et le format de ticket ne sont pas encore des règles métier implémentées.
+- Pas de mode offline.
+- Pas d'imprimante ticket.
+- Pas de recherche client complète.
+- Pas de fidélité réelle.
+- Pas de retours avancés ni clôture caisse.
+- Les images produits restent celles du catalogue actuel.
