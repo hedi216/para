@@ -19,6 +19,13 @@ export function setStoredToken(token: string | null) {
   }
 }
 
+export function createIdempotencyKey(prefix: string) {
+  const randomPart = typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  return `${prefix}-${randomPart}`;
+}
+
 export async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getStoredToken();
   const headers = new Headers(options.headers);

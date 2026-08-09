@@ -56,6 +56,19 @@ export class ProductsService {
     return presentProduct(product);
   }
 
+  async findByBarcode(barcode: string) {
+    const product = await this.prisma.product.findFirst({
+      where: { barcode, isActive: true },
+      include: productInclude,
+    });
+
+    if (!product) {
+      throw new NotFoundException('Produit introuvable pour ce code-barres.');
+    }
+
+    return presentProduct(product);
+  }
+
   async create(dto: CreateProductDto) {
     await this.ensureRelations(dto.categoryId, dto.brandId);
     const store = await this.inventory.getDefaultStore();

@@ -75,3 +75,41 @@ export type ApiInventoryItem = {
   reorderLevel: number;
   product: ApiProduct;
 };
+
+export type ApiDashboardStockAlertItem = {
+  id: string;
+  productId: string;
+  productName: string;
+  brandName: string;
+  quantity: number;
+  reserved: number;
+  available: number;
+  reorderLevel: number;
+};
+
+export type ApiDashboardActivity = {
+  id: string;
+  type: 'WEB_ORDER' | 'POS_SALE';
+  reference: string;
+  channel: 'WEB' | 'STORE';
+  customerName?: string;
+  employeeName?: string;
+  registerCode?: string;
+  status: string;
+  total: number;
+  createdAt: string;
+};
+
+export type ApiAdminDashboard = {
+  generatedAt: string;
+  store: { id: string; code: string; name: string };
+  revenue: { total: number; web: number; store: number };
+  channels: Array<{ channel: 'WEB' | 'STORE'; amount: number; count: number; percent: number }>;
+  averageBasket: number;
+  stockAlerts: {
+    outOfStock: number;
+    lowStock: number;
+    items: ApiDashboardStockAlertItem[];
+  };
+  recentActivity: ApiDashboardActivity[];
+};

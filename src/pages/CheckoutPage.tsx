@@ -2,7 +2,7 @@ import { FormEvent, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/auth-context';
 import { useCart } from '../contexts/cart-context';
-import { ApiError, apiFetch } from '../lib/api';
+import { ApiError, apiFetch, createIdempotencyKey } from '../lib/api';
 import { formatPrice } from '../lib/currency';
 import type { ApiOrder } from '../types/api';
 
@@ -34,7 +34,12 @@ export default function CheckoutPage() {
     try {
       const order = await apiFetch<ApiOrder>('/orders', {
         method: 'POST',
-        body: JSON.stringify({ ...form, paymentMethod, items: items.map((item) => ({ productId: item.id, quantity: item.quantity })) }),
+        body: JSON.stringify({
+          ...form,
+          idempotencyKey: createIdempotencyKey('web-order'),
+          paymentMethod,
+          items: items.map((item) => ({ productId: item.id, quantity: item.quantity })),
+        }),
       });
       clearCart();
       setStatus(`Commande ${order.orderNumber} confirmée.`);

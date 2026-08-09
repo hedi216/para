@@ -1,29 +1,50 @@
 # Contrats API draft - web, POS et Admin
 
-Base API proposée : `https://api.lola.tn` en production et `http://localhost:3000` en développement. Les corps sont JSON, les montants TND sont des nombres à trois décimales et les dates sont ISO 8601 UTC. Les routes protégées utilisent `Authorization: Bearer <token>`.
+Base API locale : `http://localhost:3000`. Base cible production : `https://api.lola.tn`.
 
-Ce document décrit la cible d’intégration des maquettes Stitch. Certaines routes catalogue, auth, POS et Admin existent déjà dans le backend v1 ; les routes barcode, refund, dashboard, staff et logout complètent le contrat futur et ne doivent pas être considérées comme intégrées tant que leur implémentation n’est pas livrée.
+Les corps sont JSON, les montants TND sont des nombres a trois decimales, et les routes protegees utilisent `Authorization: Bearer <token>`.
+
+## Etat d'implementation v1
+
+Deja implemente :
+
+- Catalogue public : `GET /products`, `GET /products/:id`, `GET /categories`, `GET /brands`.
+- Auth : `POST /auth/register`, `POST /auth/login`, `GET /auth/me`.
+- Commandes web : `POST /orders`, `GET /orders/my-orders`.
+- POS : `GET /pos/products`, `GET /pos/products/barcode/:barcode`, `POST /pos/sales`, `GET /pos/sales`, `POST /pos/sales/:id/refund`.
+- Admin : `GET /admin/dashboard`, `GET /admin/products`, `POST /admin/products`, `PATCH /admin/products/:id`, `GET /admin/orders`, `PATCH /admin/orders/:id/status`, `GET /admin/inventory`, `POST /admin/inventory/adjust`, `GET /admin/clients`.
+
+Encore futur :
+
+- `GET /pos/customers?search=`
+- `GET /admin/staff`
+- `POST /auth/logout` avec revocation serveur
+- pagination/filtres avances sur plusieurs listes
+- module retours complet, fidelite complete et TVA configurable
 
 ## Conventions
 
-- `storeId` et `registerId` sont obligatoires pour une vente caisse lorsque plusieurs points de vente seront activés. La v1 les déduit du magasin/caisse par défaut si nécessaire.
+- `storeId` est deduit du magasin par defaut en v1.
+- `registerId` sur le POS accepte l'identifiant technique `CashRegister.id` ou le code de caisse, par exemple `CAISSE-01`. Sans valeur, l'API utilise la caisse par defaut.
+- `customerId` sur `POST /pos/sales` correspond a `CustomerProfile.id`, pas a `User.id`. Le POS vend a un profil client/fidelite optionnel, tandis que `User.id` reste reserve a l'authentification.
+- `idempotencyKey` est acceptee par `POST /orders` et `POST /pos/sales` pour eviter les doubles creations en cas de retry reseau.
 - `channel` vaut `WEB` ou `STORE`.
-- Les erreurs emploient `{ "message": string, "code": string }`.
-- Les listes paginées ajoutent `page`, `limit`, `total` et `items` lorsque le volume le nécessite.
 
 ## Public web
 
-| Méthode | Route | Paramètres / corps | Réponse cible |
+| Methode | Route | Statut | Description |
 | --- | --- | --- | --- |
-| `GET` | `/products` | `search`, `category`, `brand`, `page`, `limit` | Produits actifs et stock disponible. |
-| `GET` | `/products/:id` | `id` ou slug | Produit, images, marque, catégorie et stock. |
-| `GET` | `/categories` | Aucun | Catégories actives. |
-| `POST` | `/orders` | Lignes, livraison/retrait, paiement | Commande confirmée, stock décrémenté. |
+| `GET` | `/products` | Implemente | Produits actifs. Filtres actuels : `search`, `category`. |
+| `GET` | `/products/:id` | Implemente | Produit par identifiant ou slug. |
+| `GET` | `/categories` | Implemente | Categories actives. |
+| `GET` | `/brands` | Implemente | Marques partenaires. |
+| `POST` | `/orders` | Implemente | Commande confirmee, paiement v1 et stock decremente. |
 
 Exemple `POST /orders` :
 
 ```json
 {
+  "idempotencyKey": "web-order-uuid",
   "items": [{ "productId": "lrp-micellaire-ultra", "quantity": 1 }],
   "paymentMethod": "CASH_ON_DELIVERY",
   "recipientName": "Amira Ben Ali",
@@ -35,80 +56,83 @@ Exemple `POST /orders` :
 
 ## POS
 
-Toutes les routes POS demandent `EMPLOYEE` ou une permission équivalente.
+Toutes les routes POS demandent `EMPLOYEE` ou `ADMIN`.
 
-| Méthode | Route | Paramètres / corps | Réponse cible |
+| Methode | Route | Statut | Description |
 | --- | --- | --- | --- |
-| `GET` | `/pos/products?search=` | Recherche nom, marque, SKU ou code-barres | Cartes produit POS avec stock du magasin courant. |
-| `GET` | `/pos/products/barcode/:barcode` | Code scanné | Produit exact ou `404 PRODUCT_NOT_FOUND`. |
-| `POST` | `/pos/sales` | Panier, paiement, client facultatif, caisse | Ticket finalisé, paiement et mouvements de stock. |
-| `GET` | `/pos/sales` | `from`, `to`, `registerId`, pagination | Tickets récents/historique. |
-| `POST` | `/pos/sales/:id/refund` | Lignes, quantités, motif, paiement | Retour contrôlé, remboursement et entrée stock. |
-| `GET` | `/pos/customers?search=` | Nom, téléphone, e-mail ou code fidélité | Clients associables avec avantages applicables. |
+| `GET` | `/pos/products?search=` | Implemente | Recherche nom, marque, SKU ou code-barres. |
+| `GET` | `/pos/products/barcode/:barcode` | Implemente | Produit actif exact par code-barres. |
+| `POST` | `/pos/sales` | Implemente | Vente caisse, paiement manuel, caisse, mouvements de stock. |
+| `GET` | `/pos/sales` | Implemente | 100 dernieres ventes caisse. |
+| `POST` | `/pos/sales/:id/refund` | Implemente simple | Restitue le stock, cree un paiement rembourse et marque la vente `VOIDED`. |
+| `GET` | `/pos/customers?search=` | Futur | Recherche client pour association/fidelite. |
 
 Exemple `POST /pos/sales` :
 
 ```json
 {
+  "idempotencyKey": "pos-sale-uuid",
   "registerId": "CAISSE-01",
-  "customerId": "cus_123",
+  "customerId": "customerProfileId_optional",
   "paymentMethod": "CASH",
-  "items": [
-    { "productId": "bioderma-photoderm-spf50", "quantity": 1 }
-  ]
+  "items": [{ "productId": "bioderma-photoderm-spf50", "quantity": 1 }]
 }
 ```
-
-La réponse doit inclure `receiptNumber`, `status`, `subtotal`, `discountTotal`, `taxRate`, `taxTotal`, `total`, `payment`, `customer` et les lignes. Le serveur déduit et fige la TVA et la remise fidélité ; le navigateur ne les décide pas.
 
 Exemple `POST /pos/sales/:id/refund` :
 
 ```json
 {
-  "items": [{ "posSaleItemId": "psi_123", "quantity": 1 }],
-  "reason": "Produit retourné intact",
+  "items": [{ "posSaleItemId": "posSaleItemId", "quantity": 1 }],
+  "reason": "Produit retourne intact",
   "paymentMethod": "CASH"
 }
 ```
 
+Limite v1 refund : pas encore de table `PosRefund`. Une vente remboursee est marquee `VOIDED`, ce qui bloque un second remboursement.
+
 ## Admin
 
-Toutes les routes Admin demandent `ADMIN` ou la permission métier correspondante.
+Toutes les routes Admin demandent `ADMIN`.
 
-| Méthode | Route | Paramètres / corps | Réponse cible |
+| Methode | Route | Statut | Description |
 | --- | --- | --- | --- |
-| `GET` | `/admin/dashboard` | `from`, `to`, `storeId`, `timezone` | KPIs, séries, canaux, alertes et commandes récentes. |
-| `GET` | `/admin/orders` | `status`, `channel`, `from`, `to`, pagination | Commandes web et projection unifiée des ventes magasin. |
-| `PATCH` | `/admin/orders/:id/status` | `{ "status": "PREPARING" }` | Commande mise à jour, mouvement retour si annulation. |
-| `GET` | `/admin/inventory` | `storeId`, `lowStock`, recherche, pagination | Inventaire, seuils et disponibilité. |
-| `PATCH` | `/admin/products/:id` | Champs catalogue éditables | Produit mis à jour. |
-| `POST` | `/admin/stock-adjustments` | Produit, magasin, delta, motif | Mouvement d’ajustement traçable. |
-| `GET` | `/admin/customers` | recherche, segment, pagination | CRM, fidélité et compteurs. |
-| `GET` | `/admin/staff` | storeId, actif, pagination | Employés, rôles, permissions et caisses autorisées. |
+| `GET` | `/admin/dashboard` | Implemente | Revenus web + magasin, canaux, panier moyen, alertes stock, activite recente. |
+| `GET` | `/admin/orders` | Implemente | Commandes web. Projection unifiee web/POS encore future. |
+| `PATCH` | `/admin/orders/:id/status` | Implemente | Mise a jour statut. Annulation restitue le stock. |
+| `GET` | `/admin/inventory` | Implemente | Inventaire du magasin par defaut. |
+| `PATCH` | `/admin/products/:id` | Implemente | Mise a jour produit. |
+| `POST` | `/admin/inventory/adjust` | Implemente | Ajustement manuel avec mouvement de stock. |
+| `POST` | `/admin/stock-adjustments` | Futur alias | Alias futur plus explicite de `/admin/inventory/adjust`. |
+| `GET` | `/admin/customers` | Implemente via `/admin/clients` | CRM minimal v1. |
+| `GET` | `/admin/staff` | Futur | Employes, roles, permissions et caisses autorisees. |
 
-Réponse cible de `GET /admin/dashboard` :
+Reponse actuelle de `GET /admin/dashboard` :
 
 ```json
 {
-  "period": { "from": "2026-08-01", "to": "2026-08-09", "timezone": "Africa/Tunis" },
-  "revenue": { "total": 3260.0, "previousPeriod": 2890.0, "changePercent": 12.8 },
+  "generatedAt": "2026-08-09T14:00:00.000Z",
+  "store": { "id": "storeId", "code": "SOUSSE-CENTRE", "name": "LOLA Parapharmacie Sousse" },
+  "revenue": { "total": 3260.0, "web": 2119.0, "store": 1141.0 },
   "channels": [
-    { "channel": "WEB", "amount": 2119.0, "percent": 65 },
-    { "channel": "STORE", "amount": 1141.0, "percent": 35 }
+    { "channel": "WEB", "amount": 2119.0, "count": 31, "percent": 65 },
+    { "channel": "STORE", "amount": 1141.0, "count": 18, "percent": 35 }
   ],
-  "averageBasket": 74.0,
-  "revenueSeries": [{ "date": "2026-08-09", "amount": 3260.0 }],
-  "stockAlerts": { "outOfStock": 3, "lowStock": 13 },
-  "recentOrders": []
+  "averageBasket": 66.53,
+  "stockAlerts": {
+    "outOfStock": 3,
+    "lowStock": 13,
+    "items": []
+  },
+  "recentActivity": []
 }
 ```
 
 ## Authentification
 
-| Méthode | Route | Description |
-| --- | --- | --- |
-| `POST` | `/auth/login` | Authentifie et retourne le token/session et le profil. |
-| `GET` | `/auth/me` | Retourne l’utilisateur, rôle et permissions effectives. |
-| `POST` | `/auth/logout` | Invalide la session active ou son refresh token. |
-
-`/auth/logout` nécessite une stratégie de session/révocation côté serveur ; supprimer uniquement le token du navigateur est insuffisant pour une déconnexion centralisée de personnel.
+| Methode | Route | Statut | Description |
+| --- | --- | --- | --- |
+| `POST` | `/auth/register` | Implemente | Cree un compte client. |
+| `POST` | `/auth/login` | Implemente | Authentifie et retourne `accessToken` + profil. |
+| `GET` | `/auth/me` | Implemente | Retourne l'utilisateur connecte. |
+| `POST` | `/auth/logout` | Futur | Revocation de session/token cote serveur. |

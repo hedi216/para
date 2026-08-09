@@ -13,6 +13,10 @@ export class OrderItemDto {
 }
 
 export class CreateOrderDto {
+  @IsOptional()
+  @IsString()
+  idempotencyKey?: string;
+
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => OrderItemDto)

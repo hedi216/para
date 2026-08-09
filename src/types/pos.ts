@@ -14,7 +14,9 @@ export type PosCartLine = OrderLine & {
 };
 
 export type PosSaleDraft = {
+  idempotencyKey?: string;
   registerId: string;
+  customerProfileId?: string | null;
   customer?: CustomerSummary | null;
   items: PosCartLine[];
   subtotal: number;

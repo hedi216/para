@@ -12,17 +12,24 @@ import { UpdateOrderStatusDto } from '../orders/dto/order.dto';
 import { OrdersService } from '../orders/orders.service';
 import { CreateProductDto, UpdateProductDto } from '../products/dto/product.dto';
 import { ProductsService } from '../products/products.service';
+import { AdminService } from './admin.service';
 
 @Controller('admin')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.ADMIN)
 export class AdminController {
   constructor(
+    private readonly admin: AdminService,
     private readonly products: ProductsService,
     private readonly orders: OrdersService,
     private readonly inventory: InventoryService,
     private readonly customers: CustomersService,
   ) {}
+
+  @Get('dashboard')
+  getDashboard() {
+    return this.admin.getDashboard();
+  }
 
   @Get('products')
   findProducts() {

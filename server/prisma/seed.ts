@@ -11,12 +11,28 @@ const brandDisplayNames: Record<string, string> = {
   cerave: 'CeraVe',
   vichy: 'Vichy',
   svr: 'SVR',
-  avene: 'Avène',
+  avene: 'Avene',
   uriage: 'Uriage',
   eucerin: 'Eucerin',
   nuxe: 'Nuxe',
   filorga: 'Filorga',
   cosrx: 'COSRX',
+};
+
+const brandIdAliases: Record<string, string> = {
+  bioderma: 'bioderma',
+  mustela: 'mustela',
+  'la-roche-posay': 'la-roche-posay',
+  cerave: 'cerave',
+  vichy: 'vichy',
+  svr: 'svr',
+  avene: 'avene',
+  'ava-ne': 'avene',
+  uriage: 'uriage',
+  eucerin: 'eucerin',
+  nuxe: 'nuxe',
+  filorga: 'filorga',
+  cosrx: 'cosrx',
 };
 
 function slugify(value: string) {
@@ -26,6 +42,10 @@ function slugify(value: string) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/(^-|-$)/g, '');
+}
+
+function resolveBrandId(value: string) {
+  return brandIdAliases[slugify(value)] ?? slugify(value);
 }
 
 async function main() {
@@ -38,6 +58,12 @@ async function main() {
       address: '2 Rue Dr Moreau',
       city: 'Sousse',
     },
+  });
+
+  await prisma.cashRegister.upsert({
+    where: { storeId_code: { storeId: store.id, code: 'CAISSE-01' } },
+    update: { label: 'Caisse 01', isActive: true },
+    create: { storeId: store.id, code: 'CAISSE-01', label: 'Caisse 01' },
   });
 
   for (const category of categories) {
@@ -56,9 +82,10 @@ async function main() {
     });
   }
 
-  for (const product of products) {
-    const brandId = slugify(product.brand).replace('la-roche-posay', 'la-roche-posay');
-    const existingBrand = await prisma.brand.findFirst({ where: { name: { equals: product.brand, mode: 'insensitive' } } });
+  for (const [index, product] of products.entries()) {
+    const brandId = resolveBrandId(product.brand);
+    const existingBrand = await prisma.brand.findUnique({ where: { id: brandId } });
+    const barcode = `619${String(index + 1).padStart(9, '0')}`;
 
     if (!existingBrand) {
       throw new Error(`Marque introuvable pour ${product.name}: ${product.brand} (${brandId})`);
@@ -73,6 +100,7 @@ async function main() {
         oldPrice: product.oldPrice,
         badge: product.badge,
         imageUrl: product.image,
+        barcode,
         categoryId: product.category,
         brandId: existingBrand.id,
       },
@@ -81,6 +109,7 @@ async function main() {
         slug: product.id,
         name: product.name,
         sku: `LOLA-${product.id.toUpperCase()}`,
+        barcode,
         price: product.price,
         oldPrice: product.oldPrice,
         badge: product.badge,
@@ -111,7 +140,7 @@ async function main() {
         quantity: product.stock,
         beforeQuantity: 0,
         afterQuantity: product.stock,
-        reason: 'Stock initial de démonstration',
+        reason: 'Stock initial de demonstration',
         reference: `SEED:${product.id}`,
       },
     });
@@ -129,8 +158,8 @@ async function main() {
 
   const employee = await prisma.user.upsert({
     where: { email: 'employee@lola.tn' },
-    update: { role: UserRole.EMPLOYEE, firstName: 'Employé', lastName: 'LOLA', passwordHash: employeePassword },
-    create: { email: 'employee@lola.tn', passwordHash: employeePassword, role: UserRole.EMPLOYEE, firstName: 'Employé', lastName: 'LOLA' },
+    update: { role: UserRole.EMPLOYEE, firstName: 'Employe', lastName: 'LOLA', passwordHash: employeePassword },
+    create: { email: 'employee@lola.tn', passwordHash: employeePassword, role: UserRole.EMPLOYEE, firstName: 'Employe', lastName: 'LOLA' },
   });
 
   const customer = await prisma.user.upsert({
@@ -157,7 +186,7 @@ async function main() {
     create: { userId: customer.id, defaultAddress: 'Sousse', city: 'Sousse' },
   });
 
-  console.log('Seed LOLA terminé.');
+  console.log('Seed LOLA termine.');
 }
 
 main()

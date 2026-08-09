@@ -13,10 +13,20 @@ export class OrdersService {
 
   async create(customerId: string, dto: CreateOrderDto) {
     if (dto.paymentMethod === PaymentMethod.ONLINE) {
-      throw new BadRequestException('Le paiement en ligne sera activé dans une prochaine version.');
+      throw new BadRequestException('Le paiement en ligne sera active dans une prochaine version.');
     }
     if (dto.paymentMethod !== PaymentMethod.CASH_ON_DELIVERY && dto.paymentMethod !== PaymentMethod.IN_STORE) {
-      throw new BadRequestException('Le moyen de paiement sélectionné est indisponible pour une commande web.');
+      throw new BadRequestException('Le moyen de paiement selectionne est indisponible pour une commande web.');
+    }
+
+    if (dto.idempotencyKey) {
+      const existingOrder = await this.prisma.order.findFirst({
+        where: { customerId, idempotencyKey: dto.idempotencyKey },
+        include: { items: true, payments: true },
+      });
+      if (existingOrder) {
+        return existingOrder;
+      }
     }
 
     const items = this.aggregateItems(dto.items);
@@ -54,6 +64,7 @@ export class OrdersService {
       const order = await tx.order.create({
         data: {
           orderNumber,
+          idempotencyKey: dto.idempotencyKey,
           customerId,
           storeId: store.id,
           status: OrderStatus.CONFIRMED,

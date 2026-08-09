@@ -312,3 +312,13 @@ Rôle :
 - Promotions avancées
 - POS offline
 - Commandes WhatsApp/Facebook
+
+## Alignement v1 ajoute
+
+Le schema Prisma v1 ajoute explicitement :
+
+- `CashRegister` pour identifier les caisses physiques, par exemple `CAISSE-01`.
+- `PosSale.registerId` pour relier chaque ticket POS a une caisse.
+- `Order.idempotencyKey` pour eviter une double commande web lors d'un retry.
+- `PosSale.idempotencyKey` pour eviter un double ticket POS lors d'un retry.
+- `PosSale.customerId` pointe vers `CustomerProfile.id`, pas vers `User.id`, afin de separer authentification et profil client/fidelite.

@@ -60,28 +60,44 @@ model Store {
   isActive       Boolean         @default(true)
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
+  cashRegisters  CashRegister[]
   inventoryItems InventoryItem[]
   stockMovements StockMovement[]
   orders         Order[]
   posSales       PosSale[]
 }
 
+model CashRegister {
+  id        String    @id @default(cuid())
+  code      String
+  label     String
+  storeId   String
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  store     Store     @relation(fields: [storeId], references: [id])
+  posSales  PosSale[]
+
+  @@unique([storeId, code])
+  @@index([storeId])
+}
+
 model User {
-  id                  String          @id @default(cuid())
-  email               String          @unique
-  passwordHash        String
-  role                UserRole
-  firstName           String
-  lastName            String
-  phone               String?
-  isActive            Boolean         @default(true)
-  createdAt           DateTime        @default(now())
-  updatedAt           DateTime        @updatedAt
-  customerProfile     CustomerProfile?
-  employeeProfile     EmployeeProfile?
-  customerOrders      Order[]         @relation("CustomerOrders")
-  posSales            PosSale[]       @relation("PosEmployee")
-  createdMovements    StockMovement[] @relation("StockMovementActor")
+  id               String           @id @default(cuid())
+  email            String           @unique
+  passwordHash     String
+  role             UserRole
+  firstName        String
+  lastName         String
+  phone            String?
+  isActive         Boolean          @default(true)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  customerProfile  CustomerProfile?
+  employeeProfile  EmployeeProfile?
+  customerOrders   Order[]          @relation("CustomerOrders")
+  posSales         PosSale[]        @relation("PosEmployee")
+  createdMovements StockMovement[]  @relation("StockMovementActor")
 }
 
 model CustomerProfile {
@@ -98,13 +114,13 @@ model CustomerProfile {
 }
 
 model EmployeeProfile {
-  id        String   @id @default(cuid())
-  userId    String   @unique
-  employeeNo String  @unique
-  jobTitle  String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id         String   @id @default(cuid())
+  userId     String   @unique
+  employeeNo String   @unique
+  jobTitle   String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Category {
@@ -129,28 +145,28 @@ model Brand {
 }
 
 model Product {
-  id          String         @id @default(cuid())
-  slug        String         @unique
-  name        String
-  description String?
-  sku         String?        @unique
-  barcode     String?        @unique
-  price       Decimal        @db.Decimal(10, 3)
-  oldPrice    Decimal?       @db.Decimal(10, 3)
-  badge       String?
-  imageUrl    String?
-  isActive    Boolean        @default(true)
-  categoryId  String
-  brandId     String
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
-  category    Category       @relation(fields: [categoryId], references: [id])
-  brand       Brand          @relation(fields: [brandId], references: [id])
-  images      ProductImage[]
+  id             String          @id @default(cuid())
+  slug           String          @unique
+  name           String
+  description    String?
+  sku            String?         @unique
+  barcode        String?         @unique
+  price          Decimal         @db.Decimal(10, 3)
+  oldPrice       Decimal?        @db.Decimal(10, 3)
+  badge          String?
+  imageUrl       String?
+  isActive       Boolean         @default(true)
+  categoryId     String
+  brandId        String
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  category       Category        @relation(fields: [categoryId], references: [id])
+  brand          Brand           @relation(fields: [brandId], references: [id])
+  images         ProductImage[]
   inventoryItems InventoryItem[]
   stockMovements StockMovement[]
-  orderItems  OrderItem[]
-  posSaleItems PosSaleItem[]
+  orderItems     OrderItem[]
+  posSaleItems   PosSaleItem[]
 
   @@index([categoryId])
   @@index([brandId])
@@ -217,6 +233,7 @@ model StockMovement {
 model Order {
   id              String          @id @default(cuid())
   orderNumber     String          @unique
+  idempotencyKey  String?
   customerId      String
   storeId         String?
   status          OrderStatus     @default(CONFIRMED)
@@ -238,21 +255,22 @@ model Order {
   payments        Payment[]
   stockMovements  StockMovement[]
 
+  @@unique([customerId, idempotencyKey])
   @@index([customerId, createdAt])
   @@index([status, createdAt])
 }
 
 model OrderItem {
-  id          String   @id @default(cuid())
+  id          String  @id @default(cuid())
   orderId     String
   productId   String
   productName String
   brandName   String
-  unitPrice   Decimal  @db.Decimal(10, 3)
+  unitPrice   Decimal @db.Decimal(10, 3)
   quantity    Int
-  lineTotal   Decimal  @db.Decimal(10, 3)
-  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  product     Product  @relation(fields: [productId], references: [id])
+  lineTotal   Decimal @db.Decimal(10, 3)
+  order       Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product     Product @relation(fields: [productId], references: [id])
 
   @@index([orderId])
 }
@@ -274,38 +292,44 @@ model Payment {
 }
 
 model PosSale {
-  id            String       @id @default(cuid())
-  receiptNumber String       @unique
-  employeeId    String
-  customerId    String?
-  storeId       String
-  status        SaleStatus   @default(COMPLETED)
-  subtotal      Decimal      @db.Decimal(10, 3)
-  total         Decimal      @db.Decimal(10, 3)
-  paymentMethod PaymentMethod
-  createdAt     DateTime     @default(now())
-  employee      User         @relation("PosEmployee", fields: [employeeId], references: [id])
-  customer      CustomerProfile? @relation(fields: [customerId], references: [id])
-  store         Store        @relation(fields: [storeId], references: [id])
-  items         PosSaleItem[]
-  payments      Payment[]
+  id             String           @id @default(cuid())
+  receiptNumber  String           @unique
+  idempotencyKey String?
+  employeeId     String
+  customerId     String?
+  storeId        String
+  registerId     String
+  status         SaleStatus       @default(COMPLETED)
+  subtotal       Decimal          @db.Decimal(10, 3)
+  total          Decimal          @db.Decimal(10, 3)
+  paymentMethod  PaymentMethod
+  createdAt      DateTime         @default(now())
+  refundedAt     DateTime?
+  employee       User             @relation("PosEmployee", fields: [employeeId], references: [id])
+  customer       CustomerProfile? @relation(fields: [customerId], references: [id])
+  store          Store            @relation(fields: [storeId], references: [id])
+  register       CashRegister     @relation(fields: [registerId], references: [id])
+  items          PosSaleItem[]
+  payments       Payment[]
   stockMovements StockMovement[]
 
+  @@unique([registerId, idempotencyKey])
   @@index([employeeId, createdAt])
   @@index([storeId, createdAt])
+  @@index([registerId, createdAt])
 }
 
 model PosSaleItem {
-  id          String   @id @default(cuid())
+  id          String  @id @default(cuid())
   posSaleId   String
   productId   String
   productName String
   brandName   String
-  unitPrice   Decimal  @db.Decimal(10, 3)
+  unitPrice   Decimal @db.Decimal(10, 3)
   quantity    Int
-  lineTotal   Decimal  @db.Decimal(10, 3)
-  posSale     PosSale  @relation(fields: [posSaleId], references: [id], onDelete: Cascade)
-  product     Product  @relation(fields: [productId], references: [id])
+  lineTotal   Decimal @db.Decimal(10, 3)
+  posSale     PosSale @relation(fields: [posSaleId], references: [id], onDelete: Cascade)
+  product     Product @relation(fields: [productId], references: [id])
 
   @@index([posSaleId])
 }

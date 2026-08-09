@@ -2,77 +2,75 @@
 
 ## Invariant central : stock unique
 
-Le web, le POS et l’Admin consultent le même inventaire. Une commande web confirmée, une vente caisse finalisée, un retour ou un ajustement créent un `StockMovement` dans une transaction unique. La quantité ne doit jamais devenir négative, même avec deux opérations concurrentes.
+Le web, le POS et l'Admin consultent le meme inventaire. Une commande web confirmee, une vente caisse finalisee, un retour ou un ajustement creent un `StockMovement` dans une transaction unique. La quantite ne doit jamais devenir negative, meme avec deux operations concurrentes.
 
-La v1 fonctionne avec un seul magasin ; les objets conservent cependant `storeId` afin d’ajouter des points de vente sans réécrire les ventes ou le stock.
+La v1 fonctionne avec un seul magasin ; les objets conservent `storeId` afin d'ajouter des points de vente sans reecrire les ventes ou le stock.
 
 ## Catalogue exploitable partout
 
-Les produits doivent exposer : identifiant, slug, catégorie, marque, prix TND, ancien prix éventuel, SKU, code-barres unique éventuel, image, statut actif et stock disponible.
+Les produits doivent exposer : identifiant, slug, categorie, marque, prix TND, ancien prix eventuel, SKU, code-barres unique, image, statut actif et stock disponible.
 
-Les accès POS doivent supporter :
+Les acces POS doivent supporter :
 
-- recherche texte par nom, marque et SKU ;
-- filtre catégorie ;
-- résolution stricte par code-barres ;
-- retour du stock de la caisse/point de vente courant ;
-- réponse rapide pour le scan et l’ajout panier.
+- recherche texte par nom, marque, SKU et code-barres ;
+- filtre categorie ;
+- resolution stricte par code-barres via `GET /pos/products/barcode/:barcode` ;
+- retour du stock du point de vente courant ;
+- reponse rapide pour le scan et l'ajout panier.
 
 ## Inventaire et alertes
 
-| Besoin | Objets et règles |
+| Besoin | Objets et regles |
 | --- | --- |
 | Stock actuel | `InventoryItem(productId, storeId, quantity, reserved, reorderLevel)`. |
-| Traçabilité | `StockMovement` signé : initialisation, ajustement, commande web, vente POS, retour. |
+| Tracabilite | `StockMovement` signe : initialisation, ajustement, commande web, vente POS, retour. |
 | Rupture | Alerte quand `availableQuantity <= 0`. |
-| Stock faible | Alerte quand `availableQuantity <= reorderLevel`. |
-| Ajustement | Motif, employé responsable, avant/après et référence obligatoire. |
+| Stock faible | Alerte quand `availableQuantity <= reorderLevel` ou seuil v1 de 5 pieces. |
+| Ajustement | Motif, employe responsable, avant/apres et reference. |
 
-La réservation de stock reste optionnelle pour les paniers v1. Le stock est décrémenté au moment métier convenu : confirmation d’une commande web ou finalisation POS.
+La reservation de stock reste optionnelle pour les paniers v1. Le stock est decremente au moment metier convenu : confirmation d'une commande web ou finalisation POS.
 
 ## Ventes POS et caisses
 
-Le POS exige les entités suivantes :
+Le POS exige les entites suivantes :
 
 - `CashRegister` : code (`CAISSE-01`), magasin, actif/inactif, ouverture et fermeture future ;
-- `PosSale` : numéro de ticket, magasin, caisse, employé, client optionnel, statut, montants, date ;
-- `PosSaleItem` : produit, libellé et prix figés, quantité, remise de ligne éventuelle, total de ligne ;
-- `PosPayment` : espèces ou carte, montant, statut, référence carte éventuelle ;
-- `StockMovement` relié à la vente ;
-- `PosRefund` ou vente inverse : motif, opérateur, lignes retournées, paiement associé et remise en stock contrôlée.
+- `PosSale` : numero de ticket, magasin, caisse, employe, client optionnel, statut, montants, date ;
+- `PosSaleItem` : produit, libelle et prix figes, quantite, total de ligne ;
+- `Payment` rattache a `posSaleId` : especes ou carte, montant, statut, reference eventuelle ;
+- `StockMovement` relie a la vente ;
+- module retour futur pour remplacer le remboursement simple v1.
 
-Une vente finalisée doit être idempotente. Le client peut être absent. S’il est associé, le serveur renvoie ses points/avantages applicables et calcule la remise fidélité ; le poste ne décide jamais seul de la valeur de la remise.
+Une vente finalisee doit etre idempotente avec `idempotencyKey`. Le client peut etre absent. S'il est associe, `customerId` correspond a `CustomerProfile.id`, pas a `User.id`, afin de relier la vente au profil client/fidelite.
 
 ## Commandes web et magasin
 
-Les commandes web gardent leur entité `Order` et leur cycle (`CONFIRMED`, `PREPARING`, `READY_FOR_PICKUP`, `OUT_FOR_DELIVERY`, `COMPLETED`, `CANCELLED`). Une vente POS est immédiatement finalisée et ne doit pas emprunter ce même workflow.
+Les commandes web gardent leur entite `Order` et leur cycle (`CONFIRMED`, `PREPARING`, `READY_FOR_PICKUP`, `OUT_FOR_DELIVERY`, `COMPLETED`, `CANCELLED`). Une vente POS est immediatement finalisee et ne doit pas emprunter ce meme workflow.
 
-Pour les tableaux Admin, l’API peut fournir une projection `SalesDocument` unifiée avec : numéro, canal `WEB | STORE`, client, total, statut, date et lien vers l’objet source.
+Pour les tableaux Admin, l'API peut fournir une projection unifiee avec : numero, canal `WEB | STORE`, client ou employe, total, statut, date et lien vers l'objet source.
 
 ## TVA, remises et montants
 
-- Tous les prix sont stockés en `Decimal(10,3)` TND ou millimes entiers, jamais en `float`.
-- La TVA de 19 % vue dans Stitch doit être configurée côté serveur. Le ticket indique explicitement si elle est incluse.
-- Les remises fidélité doivent enregistrer la règle, le montant et l’identifiant du programme appliqué.
-- Les totaux conservent sous-total, remise, TVA, frais éventuels et total final comme snapshots.
+- Tous les prix sont stockes en `Decimal(10,3)` TND ou millimes entiers, jamais en `float`.
+- La TVA de 19 % vue dans Stitch doit etre configuree cote serveur lors de l'integration finale.
+- Les remises fidelite doivent enregistrer la regle, le montant et l'identifiant du programme applique.
+- Les totaux conservent sous-total, remise, TVA, frais eventuels et total final comme snapshots.
 
 ## Dashboard et rapports
 
-Le backend Admin doit accepter une période et un fuseau, puis fournir :
+`GET /admin/dashboard` v1 fournit deja :
 
-- revenus par jour/semaine/mois ;
-- comparaison avec la période précédente ;
-- répartition Web/Magasin en montant et pourcentage ;
+- revenu total web + magasin ;
+- repartition Web/Magasin en montant, nombre et pourcentage ;
 - panier moyen ;
-- nombre de commandes/ventes ;
 - alertes rupture et stock faible ;
-- commandes récentes avec canal et statut.
+- commandes web et ventes POS recentes dans une activite unifiee.
 
-Les agrégats doivent être calculés sur les documents retenus par la règle métier, en excluant a minima annulations, tickets voidés et remboursements selon leur état.
+Les prochains rapports devront ajouter periode, fuseau horaire, comparaison avec periode precedente, export et series par jour/semaine/mois.
 
-## CRM, employés et permissions
+## CRM, employes et permissions
 
-Le CRM nécessite profil client, contacts, adresses, historique web/POS, fidélité et consentements futurs. La gestion équipe nécessite `EmployeeProfile`, statut actif, caisse/magasin autorisés et permissions granulaire.
+Le CRM necessite profil client, contacts, adresses, historique web/POS, fidelite et consentements futurs. La gestion equipe necessite `EmployeeProfile`, statut actif, caisse/magasin autorises et permissions granulaires.
 
 | Permission indicative | CUSTOMER | EMPLOYEE | ADMIN |
 | --- | --- | --- | --- |
@@ -82,6 +80,15 @@ Le CRM nécessite profil client, contacts, adresses, historique web/POS, fidéli
 | Ajuster le stock | Non | Selon permission | Oui |
 | Modifier prix/produits | Non | Non | Oui |
 | Lire les rapports globaux | Non | Selon permission | Oui |
-| Gérer les employés | Non | Non | Oui |
+| Gerer les employes | Non | Non | Oui |
 
-Le rôle est un point de départ. Les permissions doivent être vérifiées côté API, jamais seulement masquées dans le frontend.
+Le role est un point de depart. Les permissions doivent etre verifiees cote API, jamais seulement masquees dans le frontend.
+
+## Decisions v1 appliquees
+
+- Une caisse `CashRegister` existe pour le magasin par defaut, avec le code `CAISSE-01`.
+- Chaque vente POS enregistre `registerId`.
+- `POST /orders` et `POST /pos/sales` acceptent `idempotencyKey`.
+- `GET /pos/products/barcode/:barcode` existe pour le scan.
+- `POST /pos/sales/:id/refund` existe en version simple : remise en stock, paiement rembourse, vente `VOIDED`.
+- Le dashboard admin agrege commandes web, ventes POS et alertes stock.

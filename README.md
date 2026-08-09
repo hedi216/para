@@ -1,65 +1,82 @@
 # LOLA Parapharmacie
 
-Première version complète de l’écosystème LOLA : boutique e-commerce, caisse POS et administration. Les trois espaces utilisent une API NestJS et une base PostgreSQL communes afin que chaque commande confirmée ou vente finalisée modifie le même stock.
+Premiere version complete de l'ecosysteme LOLA : boutique e-commerce, caisse POS et administration. Les trois espaces utilisent une API NestJS et une base PostgreSQL communes afin que chaque commande confirmee ou vente finalisee modifie le meme stock.
 
 ## Stack
 
 - Web client, POS et administration : React 19, Vite, TypeScript, Tailwind CSS
 - API : NestJS 11, JWT, `class-validator`
-- Données : PostgreSQL et Prisma 6
+- Donnees : PostgreSQL local et Prisma 6
 
-## Démarrage local
+## Demarrage local
 
-### 1. Installer les dépendances
+### 1. Installer PostgreSQL
+
+Installez PostgreSQL normalement sur la machine, avec un serveur accessible sur `localhost:5432`.
+
+Configuration locale attendue :
+
+| Parametre | Valeur |
+| --- | --- |
+| Base | `lola_parapharmacie` |
+| Utilisateur | `para` |
+| Mot de passe | `SMART` |
+| Host | `localhost` |
+| Port | `5432` |
+
+Exemple SQL a executer avec `psql` depuis un compte superutilisateur PostgreSQL :
+
+```sql
+CREATE USER para WITH PASSWORD 'SMART';
+CREATE DATABASE lola_parapharmacie OWNER para;
+GRANT ALL PRIVILEGES ON DATABASE lola_parapharmacie TO para;
+```
+
+### 2. Installer les dependances
 
 ```powershell
 npm install
-Set-Location server
+cd server
 npm install
-Set-Location ..
 ```
 
-### 2. Démarrer PostgreSQL
+### 3. Configurer les variables d'environnement
 
-Avec Docker Desktop :
-
-```powershell
-docker compose up -d postgres
-```
-
-Sinon, créez une base PostgreSQL nommée `lola_parapharmacie` avec un utilisateur `lola` / mot de passe `lola`, puis adaptez `server/.env`.
-
-### 3. Configurer les variables d’environnement
+Depuis la racine du projet :
 
 ```powershell
 Copy-Item .env.example .env
 Copy-Item server\.env.example server\.env
 ```
 
-`server/.env` contient la connexion PostgreSQL et le secret JWT. Changez impérativement `JWT_SECRET` hors environnement local.
+`server/.env` doit contenir :
 
-### 4. Créer le schéma et charger les données de démonstration
-
-```powershell
-Set-Location server
-npm run prisma:migrate -- --name init
-npm run prisma:seed
+```env
+DATABASE_URL="postgresql://para:SMART@localhost:5432/lola_parapharmacie?schema=public"
+JWT_SECRET="change-this-long-random-secret-before-production"
+PORT=3000
+FRONTEND_ORIGIN="http://localhost:5173"
 ```
 
-Le seed crée le magasin de Sousse, les catégories, marques, produits, inventaires, mouvements initiaux et les comptes de test.
+Changez imperativement `JWT_SECRET` hors environnement local.
 
-### 5. Lancer l’application
-
-Dans un premier terminal :
+### 4. Creer le schema et charger les donnees initiales
 
 ```powershell
-Set-Location server
+cd server
+npm run prisma:migrate -- --name init
+npm run prisma:seed
 npm run start:dev
 ```
 
-Dans un second terminal :
+Le seed cree le magasin de Sousse, la caisse par defaut, les categories, marques, produits, inventaires, mouvements initiaux et les comptes de test.
+
+### 5. Lancer le frontend
+
+Dans un autre terminal, depuis la racine du projet :
 
 ```powershell
+npm install
 npm run dev
 ```
 
@@ -67,22 +84,24 @@ Ouvrez `http://localhost:5173`.
 
 ## Espaces disponibles
 
-| Espace | URL locale | Accès |
+| Espace | URL locale | Acces |
 | --- | --- | --- |
 | Boutique client | `http://localhost:5173/` | Public |
 | Compte client | `http://localhost:5173/compte` | Client |
 | Administration | `http://localhost:5173/admin` | Admin |
-| Caisse POS | `http://localhost:5173/pos` | Employé ou admin |
+| Caisse POS | `http://localhost:5173/pos` | Employe ou admin |
+
+Les pages POS et Admin actuelles sont des MVP temporaires. Les maquettes Stitch POS/Admin validees seront integrees plus tard sans changer la direction design.
 
 ## Comptes de test
 
-| Rôle | E-mail | Mot de passe |
+| Role | E-mail | Mot de passe |
 | --- | --- | --- |
 | Administrateur | `admin@lola.tn` | `Admin123!` |
-| Employé | `employee@lola.tn` | `Employee123!` |
+| Employe | `employee@lola.tn` | `Employee123!` |
 | Client | `client@lola.tn` | `Client123!` |
 
-Ces identifiants sont uniquement destinés au développement.
+Ces identifiants sont uniquement destines au developpement.
 
 ## Commandes utiles
 
@@ -90,23 +109,24 @@ Ces identifiants sont uniquement destinés au développement.
 # Construire le frontend
 npm run build
 
-# Générer le client Prisma
-Set-Location server
+# Generer le client Prisma
+cd server
 npm run prisma:generate
 
-# Ouvrir l’interface Prisma locale
+# Ouvrir l'interface Prisma locale
 npx prisma studio
 
-# Construire l’API
+# Construire l'API
 npm run build
 ```
 
-La référence des routes se trouve dans [docs/API.md](docs/API.md) et l’installation détaillée dans [docs/DEV_SETUP.md](docs/DEV_SETUP.md).
+La reference des routes se trouve dans [docs/API.md](docs/API.md) et l'installation detaillee dans [docs/DEV_SETUP.md](docs/DEV_SETUP.md).
 
 ## Limites v1
 
-- Paiement en ligne présenté dans l’interface, mais non activé.
-- Paiements POS saisis manuellement en espèces ou carte.
-- Un seul magasin opérationnel, modèle de données prêt à recevoir d’autres points de vente.
-- Pas de gestion opérationnelle des lots, dates d’expiration, retours ou fiscalisation officielle.
-- Le POS requiert une connexion à l’API ; aucun mode hors ligne n’est implémenté.
+- Paiement en ligne presente dans l'interface, mais non active.
+- Paiements POS saisis manuellement en especes ou carte.
+- Un seul magasin operationnel, modele de donnees pret a recevoir d'autres points de vente.
+- POS et Admin React sont des ecrans MVP temporaires avant integration visuelle exacte des maquettes Stitch.
+- Pas de gestion operationnelle des lots, dates d'expiration, retours avances ou fiscalisation officielle.
+- Le POS requiert une connexion a l'API ; aucun mode hors ligne n'est implemente.
