@@ -78,8 +78,11 @@ Les routes POS acceptent `EMPLOYEE` et `ADMIN`.
 
 | Methode | Route | Description |
 | --- | --- | --- |
+| `GET` | `/pos/categories` | Categories actives disponibles pour le POS. |
+| `GET` | `/pos/brands` | Marques disponibles pour le POS. |
 | `GET` | `/pos/products?search=` | Recherche par nom, marque, SKU ou code-barres. |
 | `GET` | `/pos/products/barcode/:barcode` | Produit actif exact par code-barres. |
+| `POST` | `/pos/products` | Cree un produit simple depuis la caisse, avec inventaire initial et trace `StockMovement`. |
 | `POST` | `/pos/sales` | Finalise une vente, cree un ticket interne et decremente le stock. Accepte `idempotencyKey`. |
 | `GET` | `/pos/sales` | Dernieres ventes caisse. |
 | `GET` | `/pos/sales/:id` | Detail complet d'un ticket POS. |
@@ -87,6 +90,7 @@ Les routes POS acceptent `EMPLOYEE` et `ADMIN`.
 | `GET` | `/pos/stock?search=` | Inventaire du magasin pour le POS. Recherche produit, marque, SKU ou code-barres. |
 | `POST` | `/pos/stock/adjust` | Ajustement de stock avec motif obligatoire et `StockMovement`. |
 | `GET` | `/pos/customers?search=` | Recherche client par nom, telephone ou email. |
+| `POST` | `/pos/customers` | Cree une fiche client comptoir `CUSTOMER` avec consentements marketing prepares. |
 | `POST` | `/pos/invoices` | Cree une facture interne/proforma v1 depuis un ticket POS. |
 | `GET` | `/pos/invoices` | Liste les factures internes POS. |
 | `GET` | `/pos/invoices/:id` | Detail d'une facture interne POS. |
@@ -106,6 +110,10 @@ Exemple de vente :
 
 Moyens POS actifs : `CASH`, `CARD`.
 
+`POST /pos/products` accepte nom, marque existante, categorie existante, prix, ancien prix optionnel, code-barres, SKU, stock initial, seuil faible, image URL et description. Si un `EMPLOYEE` cree le produit, `isActive` reste `false` afin d'eviter une publication automatique sur le site public ; un admin doit verifier et activer la reference. Si un `ADMIN` cree le produit, il peut etre actif directement.
+
+`POST /pos/customers` permet d'ajouter un client comptoir. L'e-mail est optionnel en v1 : si absent, le backend cree un identifiant technique interne `@lola.local` non affiche comme email client. Les champs `marketingEmailConsent`, `marketingSmsConsent`, `notes` et `source` preparent le futur marketing, sans campagne automatique.
+
 Le ticket client imprimable est un justificatif POS simple : il contient le ticket, la date, la caisse, l'employe, les lignes, le total, la remise fidelite affichee et la TVA 19 % incluse. Ce n'est pas une facture fiscale officielle.
 
 La facture POS v1 est un document interne/proforma cree depuis un ticket encaisse. Elle reference `PosSale`, recopie les lignes dans `InvoiceItem` et stocke les informations client saisies. La fiscalisation officielle devra etre validee plus tard.
@@ -117,6 +125,38 @@ Exemple d'ajustement stock POS :
   "productId": "bioderma-photoderm-spf50",
   "quantity": -1,
   "reason": "Correction inventaire caisse"
+}
+```
+
+Exemple de produit ajoute depuis le POS :
+
+```json
+{
+  "name": "Gel nettoyant test",
+  "brandId": "cerave",
+  "categoryId": "visage",
+  "price": 38.5,
+  "barcode": "619000009999",
+  "sku": "POS-TEST",
+  "initialStock": 4,
+  "reorderLevel": 2
+}
+```
+
+Exemple de client comptoir :
+
+```json
+{
+  "firstName": "Amira",
+  "lastName": "Ben Ali",
+  "phone": "22123456",
+  "email": "amira@example.com",
+  "defaultAddress": "Sousse",
+  "city": "Sousse",
+  "birthDate": "1992-04-12",
+  "marketingEmailConsent": true,
+  "marketingSmsConsent": false,
+  "notes": "Cliente comptoir"
 }
 ```
 

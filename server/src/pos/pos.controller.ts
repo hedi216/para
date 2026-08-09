@@ -5,7 +5,14 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { JwtPayload } from '../auth/types/jwt-payload';
-import { CreatePosInvoiceDto, CreatePosSaleDto, PosStockAdjustDto, RefundPosSaleDto } from './dto/pos-sale.dto';
+import {
+  CreatePosCustomerDto,
+  CreatePosInvoiceDto,
+  CreatePosProductDto,
+  CreatePosSaleDto,
+  PosStockAdjustDto,
+  RefundPosSaleDto,
+} from './dto/pos-sale.dto';
 import { PosService } from './pos.service';
 
 @Controller('pos')
@@ -19,14 +26,29 @@ export class PosController {
     return this.pos.getProducts(search);
   }
 
+  @Post('products')
+  createProduct(@CurrentUser() user: JwtPayload, @Body() dto: CreatePosProductDto) {
+    return this.pos.createProduct(dto, user);
+  }
+
   @Get('products/barcode/:barcode')
   getProductByBarcode(@Param('barcode') barcode: string) {
     return this.pos.getProductByBarcode(barcode);
   }
 
+  @Get('categories')
+  getCategories() {
+    return this.pos.getCategories();
+  }
+
+  @Get('brands')
+  getBrands() {
+    return this.pos.getBrands();
+  }
+
   @Get('stock')
-  getStock(@Query('search') search?: string) {
-    return this.pos.getStock(search);
+  getStock(@Query('search') search?: string, @Query('category') category?: string) {
+    return this.pos.getStock(search, category);
   }
 
   @Post('stock/adjust')
@@ -37,6 +59,11 @@ export class PosController {
   @Get('customers')
   getCustomers(@Query('search') search?: string) {
     return this.pos.getCustomers(search);
+  }
+
+  @Post('customers')
+  createCustomer(@Body() dto: CreatePosCustomerDto) {
+    return this.pos.createCustomer(dto);
   }
 
   @Post('sales')

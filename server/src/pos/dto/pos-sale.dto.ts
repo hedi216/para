@@ -1,5 +1,19 @@
 import { Type } from 'class-transformer';
-import { IsArray, IsEnum, IsInt, IsNotEmpty, IsOptional, IsString, Min, MinLength, ValidateNested } from 'class-validator';
+import {
+  IsArray,
+  IsBoolean,
+  IsDateString,
+  IsEmail,
+  IsEnum,
+  IsInt,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Min,
+  MinLength,
+  ValidateNested,
+} from 'class-validator';
 import { PaymentMethod } from '@prisma/client';
 
 export class PosSaleItemDto {
@@ -95,6 +109,97 @@ export class CreatePosInvoiceDto {
   @IsOptional()
   @IsString()
   taxIdentifier?: string;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
+}
+
+export class CreatePosProductDto {
+  @IsString()
+  @MinLength(2)
+  name!: string;
+
+  @IsString()
+  brandId!: string;
+
+  @IsString()
+  categoryId!: string;
+
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 3 })
+  @Min(0)
+  price!: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 3 })
+  @Min(0)
+  oldPrice?: number;
+
+  @IsOptional()
+  @IsString()
+  barcode?: string;
+
+  @IsOptional()
+  @IsString()
+  sku?: string;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  initialStock!: number;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  reorderLevel!: number;
+
+  @IsOptional()
+  @IsString()
+  imageUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+}
+
+export class CreatePosCustomerDto {
+  @IsString()
+  @MinLength(2)
+  firstName!: string;
+
+  @IsString()
+  @MinLength(2)
+  lastName!: string;
+
+  @IsString()
+  @MinLength(6)
+  phone!: string;
+
+  @IsOptional()
+  @IsEmail()
+  email?: string;
+
+  @IsOptional()
+  @IsString()
+  defaultAddress?: string;
+
+  @IsOptional()
+  @IsString()
+  city?: string;
+
+  @IsOptional()
+  @IsDateString()
+  birthDate?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  marketingEmailConsent?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  marketingSmsConsent?: boolean;
 
   @IsOptional()
   @IsString()

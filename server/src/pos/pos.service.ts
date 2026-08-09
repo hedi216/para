@@ -1,9 +1,19 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { PaymentMethod, PaymentStatus, Prisma, SaleStatus, StockMovementType } from '@prisma/client';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { randomUUID } from 'crypto';
+import * as bcrypt from 'bcryptjs';
+import { CustomerSource, PaymentMethod, PaymentStatus, Prisma, SaleStatus, StockMovementType, UserRole } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { InventoryService } from '../inventory/inventory.service';
+import { presentProduct } from '../products/products.presenter';
 import { ProductsService } from '../products/products.service';
-import { CreatePosInvoiceDto, CreatePosSaleDto, PosStockAdjustDto, RefundPosSaleDto } from './dto/pos-sale.dto';
+import {
+  CreatePosCustomerDto,
+  CreatePosInvoiceDto,
+  CreatePosProductDto,
+  CreatePosSaleDto,
+  PosStockAdjustDto,
+  RefundPosSaleDto,
+} from './dto/pos-sale.dto';
 
 const posSaleInclude = {
   employee: { select: { firstName: true, lastName: true, email: true } },
@@ -25,6 +35,13 @@ const invoiceInclude = {
   },
 } satisfies Prisma.InvoiceInclude;
 
+const productInclude = {
+  category: true,
+  brand: true,
+  images: { orderBy: { sortOrder: 'asc' as const } },
+  inventoryItems: true,
+} satisfies Prisma.ProductInclude;
+
 @Injectable()
 export class PosService {
   constructor(
@@ -39,6 +56,79 @@ export class PosService {
 
   getProductByBarcode(barcode: string) {
     return this.products.findByBarcode(barcode);
+  }
+
+  getCategories() {
+    return this.prisma.category.findMany({
+      where: { isActive: true },
+      orderBy: { name: 'asc' },
+    });
+  }
+
+  getBrands() {
+    return this.prisma.brand.findMany({
+      orderBy: { name: 'asc' },
+    });
+  }
+
+  async createProduct(dto: CreatePosProductDto, user: { sub: string; role: UserRole }) {
+    await this.ensureProductRelations(dto.categoryId, dto.brandId);
+    await this.ensureUniqueProductReferences(dto.barcode, dto.sku);
+
+    const store = await this.inventory.getDefaultStore();
+    const slug = await this.createUniqueSlug(dto.name);
+    const isActive = user.role === UserRole.ADMIN;
+    const initialStock = dto.initialStock ?? 0;
+
+    return this.prisma.$transaction(async (tx) => {
+      const product = await tx.product.create({
+        data: {
+          slug,
+          name: dto.name.trim(),
+          description: dto.description?.trim() || undefined,
+          sku: dto.sku?.trim() || undefined,
+          barcode: dto.barcode?.trim() || undefined,
+          price: dto.price,
+          oldPrice: dto.oldPrice,
+          imageUrl: dto.imageUrl?.trim() || undefined,
+          isActive,
+          categoryId: dto.categoryId,
+          brandId: dto.brandId,
+          inventoryItems: {
+            create: {
+              storeId: store.id,
+              quantity: initialStock,
+              reorderLevel: dto.reorderLevel,
+            },
+          },
+          ...(dto.imageUrl?.trim() ? { images: { create: { url: dto.imageUrl.trim(), alt: dto.name.trim() } } } : {}),
+        },
+        include: productInclude,
+      });
+
+      const inventoryItem = product.inventoryItems[0];
+      await tx.stockMovement.create({
+        data: {
+          inventoryId: inventoryItem.id,
+          productId: product.id,
+          storeId: store.id,
+          type: StockMovementType.INITIAL,
+          quantity: initialStock,
+          beforeQuantity: 0,
+          afterQuantity: initialStock,
+          reason: isActive ? 'Création produit POS par admin' : 'Création produit POS à valider par admin',
+          reference: `POS-PRODUCT:${product.slug}`,
+          createdById: user.sub,
+        },
+      });
+
+      return presentProduct(product);
+    }).catch((error) => {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new ConflictException('Code-barres, SKU ou slug déjà utilisé.');
+      }
+      throw error;
+    });
   }
 
   async createSale(employeeId: string, dto: CreatePosSaleDto) {
@@ -145,14 +235,16 @@ export class PosService {
     return sale;
   }
 
-  async getStock(search?: string) {
+  async getStock(search?: string, category?: string) {
     const query = search?.trim().toLocaleLowerCase('fr-FR');
     const items = await this.inventory.findAll();
-    if (!query) {
-      return items;
-    }
-
     return items.filter((item) => {
+      if (category && category !== 'all' && item.product.categoryId !== category && item.product.category.slug !== category) {
+        return false;
+      }
+      if (!query) {
+        return true;
+      }
       const haystack = [
         item.product.name,
         item.product.sku,
@@ -164,7 +256,28 @@ export class PosService {
         .join(' ')
         .toLocaleLowerCase('fr-FR');
       return haystack.includes(query);
-    });
+    }).map((item) => ({
+      id: item.id,
+      quantity: item.quantity,
+      reserved: item.reserved,
+      reorderLevel: item.reorderLevel,
+      product: {
+        id: item.product.id,
+        slug: item.product.slug,
+        name: item.product.name,
+        description: item.product.description,
+        sku: item.product.sku,
+        barcode: item.product.barcode,
+        price: Number(item.product.price),
+        oldPrice: item.product.oldPrice ? Number(item.product.oldPrice) : null,
+        badge: item.product.badge,
+        image: item.product.imageUrl,
+        isActive: item.product.isActive,
+        stock: item.quantity - item.reserved,
+        category: { id: item.product.category.id, slug: item.product.category.slug, name: item.product.category.name },
+        brand: { id: item.product.brand.id, slug: item.product.brand.slug, name: item.product.brand.name },
+      },
+    }));
   }
 
   adjustStock(dto: PosStockAdjustDto, employeeId: string) {
@@ -195,17 +308,84 @@ export class PosService {
       take: 50,
     });
 
-    return customers.map((customer) => ({
-      id: customer.id,
-      userId: customer.userId,
-      firstName: customer.user.firstName,
-      lastName: customer.user.lastName,
-      email: customer.user.email,
-      phone: customer.user.phone,
-      loyaltyPoints: customer.loyaltyPoints,
-      defaultAddress: customer.defaultAddress,
-      city: customer.city,
-    }));
+    return customers.map((customer) => {
+      const email = customer.user.email.endsWith('@lola.local') ? null : customer.user.email;
+      return {
+        id: customer.id,
+        userId: customer.userId,
+        firstName: customer.user.firstName,
+        lastName: customer.user.lastName,
+        email,
+        phone: customer.user.phone,
+        loyaltyPoints: customer.loyaltyPoints,
+        defaultAddress: customer.defaultAddress,
+        city: customer.city,
+        birthDate: customer.birthDate?.toISOString() ?? null,
+        marketingEmailConsent: customer.marketingEmailConsent,
+        marketingSmsConsent: customer.marketingSmsConsent,
+        notes: customer.notes,
+        source: customer.source,
+      };
+    });
+  }
+
+  async createCustomer(dto: CreatePosCustomerDto) {
+    const email = dto.email?.trim().toLowerCase();
+    const phone = dto.phone.trim();
+    if (!email && !phone) {
+      throw new BadRequestException('Le téléphone est obligatoire pour une fiche client comptoir sans e-mail.');
+    }
+
+    if (email) {
+      const existing = await this.prisma.user.findUnique({ where: { email } });
+      if (existing) {
+        throw new ConflictException('Un client existe déjà avec cet e-mail.');
+      }
+    }
+
+    const generatedEmail = email ?? `pos-${phone.replace(/\D/g, '') || randomUUID()}-${Date.now()}@lola.local`;
+    const passwordHash = await bcrypt.hash(`pos-${randomUUID()}`, 12);
+
+    const customer = await this.prisma.user.create({
+      data: {
+        email: generatedEmail,
+        passwordHash,
+        role: UserRole.CUSTOMER,
+        firstName: dto.firstName.trim(),
+        lastName: dto.lastName.trim(),
+        phone,
+        isActive: false,
+        customerProfile: {
+          create: {
+            defaultAddress: dto.defaultAddress?.trim() || undefined,
+            city: dto.city?.trim() || undefined,
+            birthDate: dto.birthDate ? new Date(dto.birthDate) : undefined,
+            marketingEmailConsent: dto.marketingEmailConsent ?? false,
+            marketingSmsConsent: dto.marketingSmsConsent ?? false,
+            notes: dto.notes?.trim() || undefined,
+            source: CustomerSource.POS_CREATED,
+          },
+        },
+      },
+      include: { customerProfile: true },
+    });
+
+    return {
+      id: customer.customerProfile!.id,
+      userId: customer.id,
+      firstName: customer.firstName,
+      lastName: customer.lastName,
+      email: email ?? null,
+      phone: customer.phone,
+      loyaltyPoints: customer.customerProfile!.loyaltyPoints,
+      defaultAddress: customer.customerProfile!.defaultAddress,
+      city: customer.customerProfile!.city,
+      birthDate: customer.customerProfile!.birthDate?.toISOString() ?? null,
+      marketingEmailConsent: customer.customerProfile!.marketingEmailConsent,
+      marketingSmsConsent: customer.customerProfile!.marketingSmsConsent,
+      notes: customer.customerProfile!.notes,
+      source: customer.customerProfile!.source,
+    };
   }
 
   async findInvoices() {
@@ -368,6 +548,55 @@ export class PosService {
       update: { label: 'Caisse 01', isActive: true },
       create: { storeId, code: 'CAISSE-01', label: 'Caisse 01' },
     });
+  }
+
+  private async ensureProductRelations(categoryId: string, brandId: string) {
+    const [category, brand] = await Promise.all([
+      this.prisma.category.findUnique({ where: { id: categoryId } }),
+      this.prisma.brand.findUnique({ where: { id: brandId } }),
+    ]);
+    if (!category || !brand) {
+      throw new BadRequestException('La catégorie ou la marque sélectionnée est invalide.');
+    }
+  }
+
+  private async ensureUniqueProductReferences(barcode?: string, sku?: string) {
+    const checks: Prisma.ProductWhereInput[] = [];
+    if (barcode?.trim()) {
+      checks.push({ barcode: barcode.trim() });
+    }
+    if (sku?.trim()) {
+      checks.push({ sku: sku.trim() });
+    }
+    if (!checks.length) {
+      return;
+    }
+
+    const existing = await this.prisma.product.findFirst({ where: { OR: checks } });
+    if (existing) {
+      throw new ConflictException('Code-barres ou SKU déjà utilisé.');
+    }
+  }
+
+  private async createUniqueSlug(name: string) {
+    const base = this.slugify(name);
+    let slug = base;
+    let suffix = 2;
+    while (await this.prisma.product.findUnique({ where: { slug } })) {
+      slug = `${base}-${suffix}`;
+      suffix += 1;
+    }
+    return slug;
+  }
+
+  private slugify(value: string) {
+    const slug = value
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '');
+    return slug || `produit-${Date.now()}`;
   }
 
   private async ensureCustomerProfile(customerId?: string) {

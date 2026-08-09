@@ -159,11 +159,16 @@ export type ApiPosCustomer = {
   userId: string;
   firstName: string;
   lastName: string;
-  email: string;
+  email?: string | null;
   phone?: string | null;
   loyaltyPoints: number;
   defaultAddress?: string | null;
   city?: string | null;
+  birthDate?: string | null;
+  marketingEmailConsent: boolean;
+  marketingSmsConsent: boolean;
+  notes?: string | null;
+  source: 'CUSTOMER_SELF_SIGNUP' | 'POS_CREATED';
 };
 
 export type ApiPosInvoiceItem = {

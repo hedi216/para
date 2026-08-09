@@ -11,7 +11,7 @@ Deja implemente :
 - Catalogue public : `GET /products`, `GET /products/:id`, `GET /categories`, `GET /brands`.
 - Auth : `POST /auth/register`, `POST /auth/login`, `GET /auth/me`.
 - Commandes web : `POST /orders`, `GET /orders/my-orders`.
-- POS : `GET /pos/products`, `GET /pos/products/barcode/:barcode`, `POST /pos/sales`, `GET /pos/sales`, `GET /pos/sales/:id`, `POST /pos/sales/:id/refund`, `GET /pos/stock`, `POST /pos/stock/adjust`, `GET /pos/customers`, `POST /pos/invoices`, `GET /pos/invoices`, `GET /pos/invoices/:id`.
+- POS : `GET /pos/categories`, `GET /pos/brands`, `GET /pos/products`, `GET /pos/products/barcode/:barcode`, `POST /pos/products`, `POST /pos/sales`, `GET /pos/sales`, `GET /pos/sales/:id`, `POST /pos/sales/:id/refund`, `GET /pos/stock`, `POST /pos/stock/adjust`, `GET /pos/customers`, `POST /pos/customers`, `POST /pos/invoices`, `GET /pos/invoices`, `GET /pos/invoices/:id`.
 - Admin : `GET /admin/dashboard`, `GET /admin/products`, `POST /admin/products`, `PATCH /admin/products/:id`, `GET /admin/orders`, `PATCH /admin/orders/:id/status`, `GET /admin/inventory`, `POST /admin/inventory/adjust`, `GET /admin/clients`.
 
 Encore futur :
@@ -20,6 +20,7 @@ Encore futur :
 - `POST /auth/logout` avec revocation serveur
 - pagination/filtres avances sur plusieurs listes
 - module retours complet, fidelite complete, fiscalisation officielle et TVA configurable
+- workflow admin de validation catalogue plus fin qu'un simple `isActive`
 
 ## Conventions
 
@@ -59,8 +60,11 @@ Toutes les routes POS demandent `EMPLOYEE` ou `ADMIN`.
 
 | Methode | Route | Statut | Description |
 | --- | --- | --- | --- |
+| `GET` | `/pos/categories` | Implemente | Categories actives pour les formulaires POS. |
+| `GET` | `/pos/brands` | Implemente | Marques existantes pour les formulaires POS. |
 | `GET` | `/pos/products?search=` | Implemente | Recherche nom, marque, SKU ou code-barres. |
 | `GET` | `/pos/products/barcode/:barcode` | Implemente | Produit actif exact par code-barres. |
+| `POST` | `/pos/products` | Implemente | Creation produit comptoir avec stock initial et validation admin recommandee. |
 | `POST` | `/pos/sales` | Implemente | Vente caisse, paiement manuel, caisse, mouvements de stock. |
 | `GET` | `/pos/sales` | Implemente | 100 dernieres ventes caisse. |
 | `GET` | `/pos/sales/:id` | Implemente | Detail complet d'un ticket POS. |
@@ -68,6 +72,7 @@ Toutes les routes POS demandent `EMPLOYEE` ou `ADMIN`.
 | `GET` | `/pos/stock?search=` | Implemente | Inventaire POS par produit, marque, SKU ou code-barres. |
 | `POST` | `/pos/stock/adjust` | Implemente | Ajustement stock avec motif obligatoire et mouvement trace. |
 | `GET` | `/pos/customers?search=` | Implemente | Recherche client pour association/fidelite future. |
+| `POST` | `/pos/customers` | Implemente | Creation client comptoir avec consentements marketing prepares. |
 | `POST` | `/pos/invoices` | Implemente | Cree une facture interne/proforma v1 depuis un ticket POS. |
 | `GET` | `/pos/invoices` | Implemente | Liste les factures internes POS. |
 | `GET` | `/pos/invoices/:id` | Implemente | Detail facture interne POS. |
@@ -98,6 +103,12 @@ Limite v1 refund : pas encore de table `PosRefund`. Une vente remboursee est mar
 
 Le ticket POS imprimable est un justificatif client simple, non fiscal officiel. La facture POS v1 est une facture interne/proforma rattachee a `PosSale`; elle stocke les informations client saisies et recopie les lignes dans `InvoiceItem`. La fiscalisation officielle tunisienne reste a valider avant usage legal.
 
+Produit POS v1 : un `EMPLOYEE` peut creer une reference simple, mais elle est creee avec `isActive: false` pour eviter la publication automatique sur `www.lola.tn`. Un `ADMIN` peut creer une reference active. Un futur workflow devra remplacer cette prudence par un vrai statut `DRAFT` / `POS_ONLY` / `PUBLISHED`.
+
+Client comptoir v1 : `POST /pos/customers` cree un `User` role `CUSTOMER` inactif et un `CustomerProfile` source `POS_CREATED`. L'e-mail est optionnel ; si absent, le backend genere un email technique `@lola.local` pour respecter la contrainte unique du modele `User`, mais cet email n'est pas affiche comme contact client.
+
+Marketing : les consentements email/SMS et notes sont stockes pour le futur CRM. Aucune campagne marketing, automatisation anniversaire ou fidelite reelle n'est lancee en v1.
+
 Exemple `POST /pos/stock/adjust` :
 
 ```json
@@ -105,6 +116,41 @@ Exemple `POST /pos/stock/adjust` :
   "productId": "bioderma-photoderm-spf50",
   "quantity": 3,
   "reason": "Reception comptoir"
+}
+```
+
+Exemple `POST /pos/products` :
+
+```json
+{
+  "name": "Gel nettoyant test",
+  "brandId": "cerave",
+  "categoryId": "visage",
+  "price": 38.5,
+  "oldPrice": 42,
+  "barcode": "619000009999",
+  "sku": "POS-TEST",
+  "initialStock": 4,
+  "reorderLevel": 2,
+  "imageUrl": "https://example.com/image.jpg",
+  "description": "Produit ajoute depuis la caisse"
+}
+```
+
+Exemple `POST /pos/customers` :
+
+```json
+{
+  "firstName": "Amira",
+  "lastName": "Ben Ali",
+  "phone": "22123456",
+  "email": "amira@example.com",
+  "defaultAddress": "Sousse",
+  "city": "Sousse",
+  "birthDate": "1992-04-12",
+  "marketingEmailConsent": true,
+  "marketingSmsConsent": false,
+  "notes": "Cliente comptoir"
 }
 ```
 

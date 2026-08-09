@@ -60,13 +60,21 @@ La fiscalisation officielle devra être validée juridiquement et techniquement 
 
 ### Gestion stock POS
 
-L'écran `/pos/stock` permet de rechercher un produit, consulter stock actuel et seuil faible, puis ajuster le stock avec une quantité positive ou négative et un motif obligatoire. L'ajustement passe par `/pos/stock/adjust` et crée un `StockMovement`.
+L'écran `/pos/stock` permet de rechercher un produit, filtrer par catégorie, consulter image miniature, marque, catégorie, code-barres, SKU, prix, stock actuel et seuil faible, puis ajuster le stock avec une quantité positive ou négative et un motif obligatoire.
 
-En v1, la route est accessible à `EMPLOYEE` et `ADMIN`. Des permissions fines devront distinguer consultation, ajustement et validation d'inventaire.
+Les libellés visibles sont métier : `Ajouter du stock`, `Retirer du stock`, `Correction inventaire`, `Réception fournisseur`, `Perte / casse`, `Retour client`. Côté technique, ces actions restent des mouvements de stock traçables via `StockMovement`.
+
+Le POS peut ajouter un produit simple via `/pos/products` avec nom, marque existante, catégorie existante, prix, ancien prix optionnel, code-barres, SKU, stock initial, seuil faible, image URL et description courte. Si l'employé crée le produit, la référence reste inactive (`isActive=false`) pour éviter une publication automatique sur le site web. Un admin doit valider/activer la fiche. Si un admin crée le produit, il peut être actif directement.
+
+En v1, la gestion stock POS est accessible à `EMPLOYEE` et `ADMIN`. Des permissions fines devront distinguer consultation, ajustement, création produit et validation catalogue.
 
 ### Recherche client
 
-L'écran `/pos/customers` recherche les clients par nom, téléphone ou email. Il affiche nom complet, téléphone, email et points fidélité. Le bouton `Sélectionner` prépare l'association future au ticket mais ne déclenche pas encore de remise réelle.
+L'écran `/pos/customers` recherche les clients par nom, téléphone ou email. Il centralise les clients créés en ligne (`CUSTOMER_SELF_SIGNUP`) et les clients ajoutés au comptoir (`POS_CREATED`).
+
+Le formulaire `Nouveau client` demande prénom, nom, téléphone, e-mail optionnel, adresse, ville, date anniversaire optionnelle, consentement marketing email, consentement marketing SMS et notes. Le marketing, les campagnes et les avantages anniversaire ne sont pas implémentés en v1 ; seuls les champs sont préparés.
+
+Le bouton `Sélectionner` prépare l'association future au ticket mais ne déclenche pas encore de remise réelle. L'association client au ticket sera connectée à l'étape fidélité.
 
 ## Encaissement
 
@@ -93,4 +101,5 @@ Le POS utilise le même design system LOLA que le web et l'Admin :
 - Pas de fidélité réelle ni règles promotionnelles POS.
 - Pas de retours avancés, avoirs, clôture caisse ou Z de caisse.
 - Pas de fiscalisation officielle des factures.
-- Les images produits restent celles du catalogue actuel.
+- Pas de workflow catalogue `DRAFT` / `POS_ONLY` / `PUBLISHED` dédié.
+- Les images produits restent celles du catalogue actuel ou les URL saisies.
