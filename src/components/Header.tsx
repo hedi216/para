@@ -12,7 +12,7 @@ type HeaderProps = {
 
 export function Header({ searchQuery, onSearchChange }: HeaderProps) {
   const { categories } = useCatalogCategories();
-  const navItems = categories.slice(0, 6);
+  const navItems = categories.slice(0, 5);
   const { count: cartCount } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -24,26 +24,26 @@ export function Header({ searchQuery, onSearchChange }: HeaderProps) {
 
   return (
     <header className="sticky top-0 z-50 border-b border-outline-variant bg-surface shadow-sm">
-      <div className="section-shell flex w-full items-center justify-between gap-4 py-4">
-        <Link className="flex items-center gap-3 text-primary" to="/" aria-label="LOLA Parapharmacie">
-          <img src={logo} alt="LOLA Parapharmacie" className="h-12 w-12 rounded-full object-cover ring-1 ring-primary-container/50" />
-          <span className="font-display text-[32px] leading-none tracking-normal md:text-[42px]">LOLA</span>
+      <div className="section-shell flex w-full items-center gap-3 py-3 md:gap-5">
+        <Link className="flex shrink-0 items-center gap-2 text-primary md:gap-3" to="/" aria-label="LOLA Parapharmacie">
+          <img src={logo} alt="LOLA Parapharmacie" className="h-10 w-10 rounded-full object-cover ring-1 ring-primary-container/50 md:h-11 md:w-11" />
+          <span className="whitespace-nowrap font-display text-[30px] leading-none tracking-normal md:text-[36px]">LOLA</span>
         </Link>
 
-        <nav className="hidden items-center gap-gutter md:flex">
+        <nav className="hidden min-w-0 flex-1 items-center justify-center gap-4 overflow-hidden md:flex lg:gap-6">
           {navItems.map((item) => (
-            <Link key={item.id} className="text-label-md font-semibold uppercase tracking-[0.05em] text-secondary transition-colors hover:text-primary" to={`/catalogue?category=${item.id}`}>
+            <Link key={item.id} className="whitespace-nowrap text-[12px] font-semibold uppercase tracking-[0.04em] text-secondary transition-colors hover:text-primary lg:text-label-md" to={`/catalogue?category=${item.id}`}>
               {item.name}
             </Link>
           ))}
         </nav>
 
-        <div className="flex items-center gap-3 text-primary">
-          <form onSubmit={submitSearch} className="hidden items-center gap-2 rounded-full border border-outline-variant bg-surface-container-lowest px-3 py-2 transition focus-within:border-primary lg:flex">
+        <div className="ml-auto flex shrink-0 items-center gap-3 text-primary">
+          <form onSubmit={submitSearch} className="hidden items-center gap-2 rounded-full border border-outline-variant bg-surface-container-lowest px-3 py-2 transition focus-within:border-primary xl:flex">
             <Icon name="search" className="text-[20px]" />
             <input
               aria-label="Rechercher un produit"
-              className="w-44 border-0 bg-transparent text-sm text-on-surface outline-none placeholder:text-on-surface-variant"
+              className="w-36 border-0 bg-transparent text-sm text-on-surface outline-none placeholder:text-on-surface-variant 2xl:w-44"
               placeholder="Rechercher"
               value={searchQuery}
               onChange={(event) => onSearchChange(event.target.value)}
